@@ -42,20 +42,15 @@ def state_from_session(age_ms, aborted):
 
 def detect_official(agent_id):
     mapping = {
-        'main':    ('储君', '太子'),        # legacy id for taizi
-        'taizi':   ('储君', '太子'),
-        'zhongshu': ('中书令', '中书省'),
-        'menxia':  ('侍中', '门下省'),
-        'shangshu': ('尚书令', '尚书省'),
-        'hubu':    ('户部尚书', '户部'),
-        'libu':    ('礼部尚书', '礼部'),
-        'bingbu':  ('兵部尚书', '兵部'),
-        'xingbu':  ('刑部尚书', '刑部'),
-        'gongbu':  ('工部尚书', '工部'),
-        'libu_hr': ('吏部尚书', '吏部'),
-        'zaochao': ('钦天监', '钦天监'),
+        'pmo':      ('PMO', 'PMO'),
+        'product':  ('产品经理', '产品'),
+        'ui':       ('UI设计师', 'UI'),
+        'frontend': ('前端开发', '前端'),
+        'backend':  ('后端开发', '后端'),
+        'qa':       ('质量保证', '测试'),
+        'ops':      ('运维部署', '运维'),
     }
-    return mapping.get(agent_id, ('尚书令', '尚书省'))
+    return mapping.get(agent_id, ('研发人员', '技术部'))
 
 
 def load_activity(session_file, limit=12):
@@ -272,8 +267,8 @@ def main():
         filtered_tasks = []
         one_day_ago = now_ms - 24 * 3600 * 1000
         for t in tasks:
-            # 始终保留 JJC 任务（如果有的话，虽然这里主要是 OC 任务，但以防万一）
-            if str(t['id']).startswith('JJC'):
+            # 始终保留 PRJ 任务（如果有的话，虽然这里主要是 OC 任务，但以防万一）
+            if str(t['id']).startswith('PRJ') or str(t['id']).startswith('JJC'):
                 filtered_tasks.append(t)
                 continue
             

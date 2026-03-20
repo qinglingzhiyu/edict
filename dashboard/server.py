@@ -142,12 +142,12 @@ def handle_task_action(task_id, action, reason):
 
 
 def handle_archive_task(task_id, archived, archive_all_done=False):
-    """Archive or unarchive a task, or batch-archive all Done/Cancelled tasks."""
+    """Archive or unarchive a task, or batch-archive all Released/Done/Cancelled tasks."""
     tasks = load_tasks()
     if archive_all_done:
         count = 0
         for t in tasks:
-            if t.get('state') in ('Done', 'Cancelled') and not t.get('archived'):
+            if t.get('state') in ('Done', 'Released', 'Cancelled') and not t.get('archived'):
                 t['archived'] = True
                 t['archivedAt'] = now_iso()
                 count += 1
@@ -651,17 +651,13 @@ def handle_review_action(task_id, action, comment=''):
 # ══ Agent 在线状态检测 ══
 
 _AGENT_DEPTS = [
-    {'id':'taizi',   'label':'太子',  'emoji':'🤴', 'role':'太子',     'rank':'储君'},
-    {'id':'zhongshu','label':'中书省','emoji':'📜', 'role':'中书令',   'rank':'正一品'},
-    {'id':'menxia',  'label':'门下省','emoji':'🔍', 'role':'侍中',     'rank':'正一品'},
-    {'id':'shangshu','label':'尚书省','emoji':'📮', 'role':'尚书令',   'rank':'正一品'},
-    {'id':'hubu',    'label':'户部',  'emoji':'💰', 'role':'户部尚书', 'rank':'正二品'},
-    {'id':'libu',    'label':'礼部',  'emoji':'📝', 'role':'礼部尚书', 'rank':'正二品'},
-    {'id':'bingbu',  'label':'兵部',  'emoji':'⚔️', 'role':'兵部尚书', 'rank':'正二品'},
-    {'id':'xingbu',  'label':'刑部',  'emoji':'⚖️', 'role':'刑部尚书', 'rank':'正二品'},
-    {'id':'gongbu',  'label':'工部',  'emoji':'🔧', 'role':'工部尚书', 'rank':'正二品'},
-    {'id':'libu_hr', 'label':'吏部',  'emoji':'👔', 'role':'吏部尚书', 'rank':'正二品'},
-    {'id':'zaochao', 'label':'钦天监','emoji':'📰', 'role':'朝报官',   'rank':'正三品'},
+    {'id':'pmo',      'label':'PMO',       'emoji':'📋', 'role':'项目管理',  'rank':'P8'},
+    {'id':'product',  'label':'产品经理',  'emoji':'💡', 'role':'产品经理',  'rank':'P7'},
+    {'id':'ui',       'label':'UI设计师',  'emoji':'🎨', 'role':'UI设计师',  'rank':'P6'},
+    {'id':'frontend', 'label':'前端工程师','emoji':'💻', 'role':'前端开发',  'rank':'P6'},
+    {'id':'backend',  'label':'后端工程师','emoji':'🗄️', 'role':'后端开发',  'rank':'P6'},
+    {'id':'qa',       'label':'测试工程师','emoji':'🔍', 'role':'质量保证',  'rank':'P6'},
+    {'id':'ops',      'label':'运维工程师','emoji':'🚀', 'role':'运维部署',  'rank':'P7'},
 ]
 
 
@@ -856,22 +852,19 @@ def wake_agent(agent_id, message=''):
 
 # 状态 → agent_id 映射
 _STATE_AGENT_MAP = {
-    'Taizi': 'taizi',
-    'Zhongshu': 'zhongshu',
-    'Menxia': 'menxia',
-    'Assigned': 'shangshu',
-    'Doing': None,         # 六部，需从 org 推断
-    'Review': 'shangshu',
-    'Next': None,          # 待执行，从 org 推断
-    'Pending': 'zhongshu', # 待处理，默认中书省
+    'Backlog': 'pmo',
+    'Planning': 'product',
+    'Designing': 'ui',
+    'Developing': None,
+    'Testing': 'qa',
+    'ReadyForRelease': 'ops',
 }
 _ORG_AGENT_MAP = {
-    '礼部': 'libu', '户部': 'hubu', '兵部': 'bingbu',
-    '刑部': 'xingbu', '工部': 'gongbu', '吏部': 'libu_hr',
-    '中书省': 'zhongshu', '门下省': 'menxia', '尚书省': 'shangshu',
+    'PMO': 'pmo', '产品': 'product', 'UI': 'ui',
+    '前端': 'frontend', '后端': 'backend', '测试': 'qa', '运维': 'ops',
 }
 
-_TERMINAL_STATES = {'Done', 'Cancelled'}
+_TERMINAL_STATES = {'Done', 'Released', 'Cancelled'}
 
 
 def _parse_iso(ts):
@@ -988,12 +981,12 @@ def handle_scheduler_retry(task_id, reason=''):
     sched = _ensure_scheduler(task)
     sched['retryCount'] = int(sched.get('retryCount') or 0) + 1
     sched['lastRetryAt'] = now_iso()
-    sched['lastDispatchTrigger'] = 'taizi-retry'
+    sched['lastDispatchTrigger'] = 'pmo-retry'
     _scheduler_add_flow(task, f'触发重试第{sched["retryCount"]}次：{reason or "超时未推进"}')
     task['updatedAt'] = now_iso()
     save_tasks(tasks)
 
-    dispatch_for_state(task_id, task, state, trigger='taizi-retry')
+    dispatch_for_state(task_id, task, state, trigger='pmo-retry')
     return {'ok': True, 'message': f'{task_id} 已触发重试派发', 'retryCount': sched['retryCount']}
 
 
@@ -1045,7 +1038,7 @@ def handle_scheduler_rollback(task_id, reason=''):
     old_state = task.get('state', '')
     task['state'] = snap_state
     task['org'] = snapshot.get('org', task.get('org', ''))
-    task['now'] = f'↩️ 太子调度自动回滚：{reason or "恢复到上个稳定节点"}'
+    task['now'] = f'↩️ PMO调度自动回滚：{reason or "恢复到上个稳定节点"}'
     task['block'] = '无'
     sched['retryCount'] = 0
     sched['escalationLevel'] = 0
@@ -1056,7 +1049,7 @@ def handle_scheduler_rollback(task_id, reason=''):
     save_tasks(tasks)
 
     if snap_state not in _TERMINAL_STATES:
-        dispatch_for_state(task_id, task, snap_state, trigger='taizi-rollback')
+        dispatch_for_state(task_id, task, snap_state, trigger='pmo-rollback')
 
     return {'ok': True, 'message': f'{task_id} 已回滚到 {snap_state}'}
 
@@ -1099,7 +1092,7 @@ def handle_scheduler_scan(threshold_sec=600):
         if retry_count < max_retry:
             sched['retryCount'] = retry_count + 1
             sched['lastRetryAt'] = now_iso()
-            sched['lastDispatchTrigger'] = 'taizi-scan-retry'
+            sched['lastDispatchTrigger'] = 'pmo-scan-retry'
             _scheduler_add_flow(task, f'停滞{stalled_sec}秒，触发自动重试第{sched["retryCount"]}次')
             pending_retries.append((task_id, state))
             actions.append({'taskId': task_id, 'action': 'retry', 'stalledSec': stalled_sec})
@@ -1125,7 +1118,7 @@ def handle_scheduler_scan(threshold_sec=600):
                 old_state = state
                 task['state'] = snap_state
                 task['org'] = snapshot.get('org', task.get('org', ''))
-                task['now'] = '↩️ 太子调度自动回滚到稳定节点'
+                task['now'] = '↩️ PMO调度自动回滚到稳定节点'
                 task['block'] = '无'
                 sched['retryCount'] = 0
                 sched['escalationLevel'] = 0
@@ -1142,11 +1135,11 @@ def handle_scheduler_scan(threshold_sec=600):
     for task_id, state in pending_retries:
         retry_task = next((t for t in tasks if t.get('id') == task_id), None)
         if retry_task:
-            dispatch_for_state(task_id, retry_task, state, trigger='taizi-scan-retry')
+            dispatch_for_state(task_id, retry_task, state, trigger='pmo-scan-retry')
 
     for task_id, state, target, target_label, stalled_sec in pending_escalates:
         msg = (
-            f'🧭 太子调度升级通知\n'
+            f'🧭 PMO调度升级通知\n'
             f'任务ID: {task_id}\n'
             f'当前状态: {state}\n'
             f'已停滞: {stalled_sec} 秒\n'
@@ -1158,7 +1151,7 @@ def handle_scheduler_scan(threshold_sec=600):
     for task_id, state in pending_rollbacks:
         rollback_task = next((t for t in tasks if t.get('id') == task_id), None)
         if rollback_task and state not in _TERMINAL_STATES:
-            dispatch_for_state(task_id, rollback_task, state, trigger='taizi-auto-rollback')
+            dispatch_for_state(task_id, rollback_task, state, trigger='pmo-auto-rollback')
 
     return {
         'ok': True,
@@ -1864,18 +1857,17 @@ def get_task_activity(task_id):
 
 # 状态推进顺序（手动推进用）
 _STATE_FLOW = {
-    'Pending':  ('Taizi', '皇上', '太子', '待处理旨意转交太子分拣'),
-    'Taizi':    ('Zhongshu', '太子', '中书省', '太子分拣完毕，转中书省起草'),
-    'Zhongshu': ('Menxia', '中书省', '门下省', '中书省方案提交门下省审议'),
-    'Menxia':   ('Assigned', '门下省', '尚书省', '门下省准奏，转尚书省派发'),
-    'Assigned': ('Doing', '尚书省', '六部', '尚书省开始派发执行'),
-    'Next':     ('Doing', '尚书省', '六部', '待执行任务开始执行'),
-    'Doing':    ('Review', '六部', '尚书省', '各部完成，进入汇总'),
-    'Review':   ('Done', '尚书省', '太子', '全流程完成，回奏太子转报皇上'),
+    'Pending':  ('Backlog', '业务方', 'PMO', '需求已接收，转交PMO排期'),
+    'Backlog':  ('Planning', 'PMO', '产品经理', '排期完成，转产品经理规划'),
+    'Planning': ('Designing', '产品经理', 'UI设计师', 'PRD已完成，转交UI设计'),
+    'Designing':('Developing', 'UI设计师', '研发', '设计完成，进入研发阶段'),
+    'Developing':('Testing', '研发', '测试工程师', '开发完成，进入联调测试'),
+    'Testing':  ('ReadyForRelease', '测试工程师', '运维工程师', '测试通过，转运维发布'),
+    'ReadyForRelease': ('Released', '运维工程师', '业务方', '已成功发布上线'),
 }
 _STATE_LABELS = {
-    'Pending': '待处理', 'Taizi': '太子', 'Zhongshu': '中书省', 'Menxia': '门下省',
-    'Assigned': '尚书省', 'Next': '待执行', 'Doing': '执行中', 'Review': '审查', 'Done': '完成',
+    'Pending': '待处理', 'Backlog': 'PMO', 'Planning': '产品经理', 'Designing': 'UI设计师',
+    'Developing': '研发', 'Testing': '测试工程师', 'ReadyForRelease': '运维工程师', 'Released': '完成',
 }
 
 
@@ -1904,40 +1896,53 @@ def dispatch_for_state(task_id, task, new_state, trigger='state-transition'):
 
     # 根据 agent_id 构造针对性消息
     _msgs = {
-        'taizi': (
-            f'📜 皇上旨意需要你处理\n'
+        'pmo': (
+            f'📋 业务方需求需要你处理\n'
             f'任务ID: {task_id}\n'
-            f'旨意: {title}\n'
+            f'需求: {title}\n'
             f'⚠️ 看板已有此任务，请勿重复创建。直接用 kanban_update.py 更新状态。\n'
-            f'请立即转交中书省起草执行方案。'
+            f'请立即进行排期并转交产品经理。'
         ),
-        'zhongshu': (
-            f'📜 旨意已到中书省，请起草方案\n'
+        'product': (
+            f'💡 需求已到产品经理，请输出PRD\n'
             f'任务ID: {task_id}\n'
-            f'旨意: {title}\n'
-            f'⚠️ 看板已有此任务记录，请勿重复创建。直接用 kanban_update.py state 更新状态。\n'
-            f'请立即起草执行方案，走完完整三省流程（中书起草→门下审议→尚书派发→六部执行）。'
+            f'需求: {title}\n'
+            f'⚠️ 看板已有此任务记录，请勿重复创建。\n'
+            f'请立即起草PRD，并转交UI或研发。'
         ),
-        'menxia': (
-            f'📋 中书省方案提交审议\n'
+        'ui': (
+            f'🎨 PRD已完成，请进行UI设计\n'
             f'任务ID: {task_id}\n'
-            f'旨意: {title}\n'
+            f'需求: {title}\n'
             f'⚠️ 看板已有此任务，请勿重复创建。\n'
-            f'请审议中书省方案，给出准奏或封驳意见。'
+            f'请输出设计稿。'
         ),
-        'shangshu': (
-            f'📮 门下省已准奏，请派发执行\n'
+        'frontend': (
+            f'💻 设计已完成，请进行前端开发\n'
             f'任务ID: {task_id}\n'
-            f'旨意: {title}\n'
-            f'{"建议派发部门: " + target_dept if target_dept else ""}\n'
+            f'需求: {title}\n'
             f'⚠️ 看板已有此任务，请勿重复创建。\n'
-            f'请分析方案并派发给六部执行。'
+            f'请进行页面开发。'
+        ),
+        'qa': (
+            f'🔍 研发已完成，请进行测试\n'
+            f'任务ID: {task_id}\n'
+            f'需求: {title}\n'
+            f'⚠️ 看板已有此任务，请勿重复创建。\n'
+            f'请进行联调测试。'
+        ),
+        'ops': (
+            f'🚀 测试已通过，请进行部署上线\n'
+            f'任务ID: {task_id}\n'
+            f'需求: {title}\n'
+            f'⚠️ 看板已有此任务，请勿重复创建。\n'
+            f'请执行发布操作。'
         ),
     }
     msg = _msgs.get(agent_id, (
         f'📌 请处理任务\n'
         f'任务ID: {task_id}\n'
-        f'旨意: {title}\n'
+        f'需求: {title}\n'
         f'⚠️ 看板已有此任务，请勿重复创建。直接用 kanban_update.py 更新状态。'
     ))
 

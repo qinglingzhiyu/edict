@@ -23,17 +23,13 @@ MODEL_PRICING = {
 }
 
 OFFICIALS = [
-    {'id':'taizi',   'label':'太子',  'role':'太子',    'emoji':'🤴','rank':'储君'},
-    {'id':'zhongshu','label':'中书省','role':'中书令',  'emoji':'📜','rank':'正一品'},
-    {'id':'menxia',  'label':'门下省','role':'侍中',    'emoji':'🔍','rank':'正一品'},
-    {'id':'shangshu','label':'尚书省','role':'尚书令',  'emoji':'📮','rank':'正一品'},
-    {'id':'libu',    'label':'礼部',  'role':'礼部尚书','emoji':'📝','rank':'正二品'},
-    {'id':'hubu',    'label':'户部',  'role':'户部尚书','emoji':'💰','rank':'正二品'},
-    {'id':'bingbu',  'label':'兵部',  'role':'兵部尚书','emoji':'⚔️','rank':'正二品'},
-    {'id':'xingbu',  'label':'刑部',  'role':'刑部尚书','emoji':'⚖️','rank':'正二品'},
-    {'id':'gongbu',  'label':'工部',  'role':'工部尚书','emoji':'🔧','rank':'正二品'},
-    {'id':'libu_hr', 'label':'吏部',  'role':'吏部尚书','emoji':'👔','rank':'正二品'},
-    {'id':'zaochao', 'label':'钦天监','role':'朝报官',  'emoji':'📰','rank':'正三品'},
+    {'id':'pmo',      'label':'PMO',       'role':'项目管理',  'emoji':'📋','rank':'P8'},
+    {'id':'product',  'label':'产品经理',  'role':'产品经理',  'emoji':'💡','rank':'P7'},
+    {'id':'ui',       'label':'UI设计师',  'role':'UI设计师',  'emoji':'🎨','rank':'P6'},
+    {'id':'frontend', 'label':'前端工程师','role':'前端开发',  'emoji':'💻','rank':'P6'},
+    {'id':'backend',  'label':'后端工程师','role':'后端开发',  'emoji':'🗄️','rank':'P6'},
+    {'id':'qa',       'label':'测试工程师','role':'质量保证',  'emoji':'🔍','rank':'P6'},
+    {'id':'ops',      'label':'运维工程师','role':'运维部署',  'emoji':'🚀','rank':'P7'},
 ]
 
 def rj(p, d):
@@ -131,14 +127,14 @@ def calc_cost(s, model):
     return round(usd, 4)
 
 def get_task_stats(org_label, tasks):
-    done   = [t for t in tasks if t.get('state')=='Done' and t.get('org')==org_label]
-    active = [t for t in tasks if t.get('state') in ('Doing','Review','Assigned') and t.get('org')==org_label]
+    done   = [t for t in tasks if t.get('state') in ('Done', 'Released') and t.get('org')==org_label]
+    active = [t for t in tasks if t.get('state') in ('Planning','Designing','Developing','Testing','ReadyForRelease') and t.get('org')==org_label]
     fl = sum(1 for t in tasks for f in t.get('flow_log',[])
              if f.get('from')==org_label or f.get('to')==org_label)
-    # 参与的旨意（JJC）列表
+    # 参与的旨意（JJC）或项目（PRJ）列表
     participated = []
     for t in tasks:
-        if not t['id'].startswith('JJC'): continue
+        if not (t['id'].startswith('JJC') or t['id'].startswith('PRJ')): continue
         for f in t.get('flow_log',[]):
             if f.get('from')==org_label or f.get('to')==org_label:
                 if t['id'] not in [x['id'] for x in participated]:

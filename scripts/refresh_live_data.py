@@ -66,7 +66,7 @@ def main():
 
     today_str = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
     def _is_today_done(t):
-        if t.get('state') != 'Done':
+        if t.get('state') not in ('Done', 'Released'):
             return False
         ua = t.get('updatedAt', '')
         if isinstance(ua, str) and ua[:10] == today_str:
@@ -77,13 +77,13 @@ def main():
             return True
         return False
     today_done = sum(1 for t in tasks if _is_today_done(t))
-    total_done = sum(1 for t in tasks if t.get('state') == 'Done')
-    in_progress = sum(1 for t in tasks if t.get('state') in ['Doing', 'Review', 'Next', 'Blocked'])
+    total_done = sum(1 for t in tasks if t.get('state') in ('Done', 'Released'))
+    in_progress = sum(1 for t in tasks if t.get('state') in ['Planning', 'Designing', 'Developing', 'Testing', 'ReadyForRelease', 'Blocked'])
     blocked = sum(1 for t in tasks if t.get('state') == 'Blocked')
 
     history = []
     for t in tasks:
-        if t.get('state') == 'Done':
+        if t.get('state') in ('Done', 'Released'):
             lm = t.get('outputMeta', {}).get('lastModified')
             history.append({
                 'at': lm or '未知',

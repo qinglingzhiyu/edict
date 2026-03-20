@@ -3,8 +3,8 @@ import { api, type Task } from '../api';
 
 // 排序权重
 const STATE_ORDER: Record<string, number> = {
-  Doing: 0, Review: 1, Assigned: 2, Menxia: 3, Zhongshu: 4,
-  Taizi: 5, Inbox: 6, Blocked: 7, Next: 8, Done: 9, Cancelled: 10,
+  Developing: 0, Testing: 1, Designing: 2, Planning: 3, Backlog: 4,
+  Inbox: 5, Blocked: 6, ReadyForRelease: 7, Next: 8, Released: 9, Done: 9, Cancelled: 10,
 };
 
 function MiniPipe({ task }: { task: Task }) {
@@ -36,7 +36,7 @@ function EdictCard({ task }: { task: Task }) {
   const todos = task.todos || [];
   const todoDone = todos.filter((x) => x.status === 'completed').length;
   const todoTotal = todos.length;
-  const canStop = !['Done', 'Blocked', 'Cancelled'].includes(task.state);
+  const canStop = !['Done', 'Released', 'Blocked', 'Cancelled'].includes(task.state);
   const canResume = ['Blocked', 'Cancelled'].includes(task.state);
   const archived = isArchived(task);
   const isBlocked = task.block && task.block !== '无' && task.block !== '-';
@@ -171,13 +171,13 @@ export default function EdictBoard() {
 
   edicts.sort((a, b) => (STATE_ORDER[a.state] ?? 9) - (STATE_ORDER[b.state] ?? 9));
 
-  const unArchivedDone = allEdicts.filter((t) => !t.archived && ['Done', 'Cancelled'].includes(t.state));
+  const unArchivedDone = allEdicts.filter((t) => !t.archived && ['Done', 'Released', 'Cancelled'].includes(t.state));
 
   const handleArchiveAll = async () => {
-    if (!confirm('将所有已完成/已取消的旨意移入归档？')) return;
+    if (!confirm('将所有已完成/已取消的需求移入归档？')) return;
     try {
       const r = await api.archiveAllDone();
-      if (r.ok) { toast(`📦 ${r.count || 0} 道旨意已归档`); loadAll(); }
+      if (r.ok) { toast(`📦 ${r.count || 0} 个需求已归档`); loadAll(); }
       else toast(r.error || '批量归档失败', 'err');
     } catch { toast('服务器连接失败', 'err'); }
   };
@@ -185,7 +185,7 @@ export default function EdictBoard() {
   const handleScan = async () => {
     try {
       const r = await api.schedulerScan();
-      if (r.ok) toast(`🧭 太子巡检完成：${r.count || 0} 个动作`);
+      if (r.ok) toast(`🧭 PMO巡检完成：${r.count || 0} 个动作`);
       else toast(r.error || '巡检失败', 'err');
       loadAll();
     } catch { toast('服务器连接失败', 'err'); }
@@ -218,9 +218,9 @@ export default function EdictBoard() {
       <div className="edict-grid">
         {edicts.length === 0 ? (
           <div className="empty" style={{ gridColumn: '1/-1' }}>
-            暂无旨意<br />
+            暂无需求<br />
             <small style={{ fontSize: 11, marginTop: 6, display: 'block', color: 'var(--muted)' }}>
-              通过飞书向太子发送任务，太子分拣后转中书省处理
+              通过聊天发送需求，PMO 分拣后转产品经理处理
             </small>
           </div>
         ) : (

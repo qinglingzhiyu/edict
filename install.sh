@@ -92,7 +92,7 @@ backup_existing() {
 create_workspaces() {
   info "创建 Agent Workspace..."
   
-  AGENTS=(taizi zhongshu menxia shangshu hubu libu bingbu xingbu gongbu libu_hr zaochao)
+  AGENTS=(pmo product ui frontend backend qa ops)
   for agent in "${AGENTS[@]}"; do
     ws="$OC_HOME/workspace-$agent"
     mkdir -p "$ws/skills"
@@ -135,17 +135,13 @@ cfg_path = pathlib.Path.home() / '.openclaw' / 'openclaw.json'
 cfg = json.loads(cfg_path.read_text())
 
 AGENTS = [
-  {"id": "taizi",    "subagents": {"allowAgents": ["zhongshu"]}},
-    {"id": "zhongshu", "subagents": {"allowAgents": ["menxia", "shangshu"]}},
-    {"id": "menxia",   "subagents": {"allowAgents": ["shangshu", "zhongshu"]}},
-  {"id": "shangshu", "subagents": {"allowAgents": ["zhongshu", "menxia", "hubu", "libu", "bingbu", "xingbu", "gongbu", "libu_hr"]}},
-    {"id": "hubu",     "subagents": {"allowAgents": ["shangshu"]}},
-    {"id": "libu",     "subagents": {"allowAgents": ["shangshu"]}},
-    {"id": "bingbu",   "subagents": {"allowAgents": ["shangshu"]}},
-    {"id": "xingbu",   "subagents": {"allowAgents": ["shangshu"]}},
-    {"id": "gongbu",   "subagents": {"allowAgents": ["shangshu"]}},
-  {"id": "libu_hr",  "subagents": {"allowAgents": ["shangshu"]}},
-  {"id": "zaochao",  "subagents": {"allowAgents": []}},
+  {"id": "pmo",      "subagents": {"allowAgents": ["product"]}},
+  {"id": "product",  "subagents": {"allowAgents": ["pmo", "ui", "frontend", "backend", "qa"]}},
+  {"id": "ui",       "subagents": {"allowAgents": ["product", "frontend"]}},
+  {"id": "frontend", "subagents": {"allowAgents": ["product", "backend", "qa"]}},
+  {"id": "backend",  "subagents": {"allowAgents": ["product", "frontend", "qa"]}},
+  {"id": "qa",       "subagents": {"allowAgents": ["product", "frontend", "backend", "ops"]}},
+  {"id": "ops",      "subagents": {"allowAgents": ["qa", "pmo"]}},
 ]
 
 agents_cfg = cfg.setdefault('agents', {})
@@ -239,7 +235,7 @@ PYEOF
 link_resources() {
   info "创建 data/scripts 软链接以确保 Agent 数据一致..."
   
-  AGENTS=(taizi zhongshu menxia shangshu hubu libu bingbu xingbu gongbu libu_hr zaochao)
+  AGENTS=(pmo product ui frontend backend qa ops)
   LINKED=0
   for agent in "${AGENTS[@]}"; do
     ws="$OC_HOME/workspace-$agent"
@@ -314,7 +310,7 @@ sync_auth() {
   if [ -z "$MAIN_AUTH" ] || [ ! -f "$MAIN_AUTH" ]; then
     warn "未找到已有的 auth-profiles.json"
     warn "请先为任意 Agent 配置 API Key:"
-    echo "    openclaw agents add taizi"
+    echo "    openclaw agents add pmo"
     echo "  然后重新运行 install.sh，或手动执行:"
     echo "    bash install.sh --sync-auth"
     return
@@ -323,11 +319,11 @@ sync_auth() {
   # 检查文件内容是否有效（非空 JSON）
   if ! python3 -c "import json; d=json.load(open('$MAIN_AUTH')); assert d" 2>/dev/null; then
     warn "auth-profiles.json 为空或无效，请先配置 API Key:"
-    echo "    openclaw agents add taizi"
+    echo "    openclaw agents add pmo"
     return
   fi
 
-  AGENTS=(taizi zhongshu menxia shangshu hubu libu bingbu xingbu gongbu libu_hr zaochao)
+  AGENTS=(pmo product ui frontend backend qa ops)
   SYNCED=0
   for agent in "${AGENTS[@]}"; do
     AGENT_DIR="$OC_HOME/agents/$agent/agent"
@@ -409,7 +405,7 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 echo "下一步："
 echo "  1. 配置 API Key（如尚未配置）:"
-echo "     openclaw agents add taizi     # 按提示输入 Anthropic API Key"
+echo "     openclaw agents add pmo       # 按提示输入 Anthropic API Key"
 echo "     ./install.sh                  # 重新运行以同步到所有 Agent"
 echo "  2. 启动数据刷新循环:  bash scripts/run_loop.sh &"
 echo "  3. 启动看板服务器:    python3 dashboard/server.py"

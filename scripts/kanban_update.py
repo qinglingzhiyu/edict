@@ -43,30 +43,28 @@ from file_lock import atomic_json_read, atomic_json_update  # noqa: E402
 from utils import now_iso  # noqa: E402
 
 STATE_ORG_MAP = {
-    'Taizi': '太子', 'Zhongshu': '中书省', 'Menxia': '门下省', 'Assigned': '尚书省',
-    'Doing': '执行中', 'Review': '尚书省', 'Done': '完成', 'Blocked': '阻塞',
+    'Backlog': 'PMO', 'Planning': '产品', 'Designing': 'UI', 'Developing': '研发',
+    'Testing': '测试', 'ReadyForRelease': '运维', 'Released': '完成', 'Blocked': '阻塞',
 }
 
 _STATE_AGENT_MAP = {
-    'Taizi': 'taizi',
-    'Zhongshu': 'zhongshu',
-    'Menxia': 'menxia',
-    'Assigned': 'shangshu',
-    'Review': 'shangshu',
-    'Pending': 'zhongshu',
+    'Backlog': 'pmo',
+    'Planning': 'product',
+    'Designing': 'ui',
+    'Developing': 'frontend',
+    'Testing': 'qa',
+    'ReadyForRelease': 'ops',
 }
 
 _ORG_AGENT_MAP = {
-    '礼部': 'libu', '户部': 'hubu', '兵部': 'bingbu',
-    '刑部': 'xingbu', '工部': 'gongbu', '吏部': 'libu_hr',
-    '中书省': 'zhongshu', '门下省': 'menxia', '尚书省': 'shangshu',
+    'PMO': 'pmo', '产品': 'product', 'UI': 'ui',
+    '前端': 'frontend', '后端': 'backend', '测试': 'qa', '运维': 'ops',
 }
 
 _AGENT_LABELS = {
-    'main': '太子', 'taizi': '太子',
-    'zhongshu': '中书省', 'menxia': '门下省', 'shangshu': '尚书省',
-    'libu': '礼部', 'hubu': '户部', 'bingbu': '兵部', 'xingbu': '刑部',
-    'gongbu': '工部', 'libu_hr': '吏部', 'zaochao': '钦天监',
+    'pmo': 'PMO', 'product': '产品经理', 'ui': 'UI设计师',
+    'frontend': '前端工程师', 'backend': '后端工程师',
+    'qa': '测试工程师', 'ops': '运维工程师'
 }
 
 MAX_PROGRESS_LOG = 100  # 单任务最大进展日志条数
@@ -189,7 +187,7 @@ def cmd_create(task_id, title, state, org, official, remark=None):
     def modifier(tasks):
         existing = next((t for t in tasks if t.get('id') == task_id), None)
         if existing:
-            if existing.get('state') in ('Done', 'Cancelled'):
+            if existing.get('state') in ('Done', 'Released', 'Cancelled'):
                 log.warning(f'⚠️ 任务 {task_id} 已完结 (state={existing["state"]})，不可覆盖')
                 return tasks
             if existing.get('state') not in (None, '', 'Inbox', 'Pending'):
@@ -200,7 +198,7 @@ def cmd_create(task_id, title, state, org, official, remark=None):
             "org": actual_org, "state": state,
             "now": clean_remark[:60] if remark else f"已下旨，等待{actual_org}接旨",
             "eta": "-", "block": "无", "output": "", "ac": "",
-            "flow_log": [{"at": now_iso(), "from": "皇上", "to": actual_org, "remark": clean_remark}],
+            "flow_log": [{"at": now_iso(), "from": "业务方", "to": actual_org, "remark": clean_remark}],
             "updatedAt": now_iso()
         })
         return tasks
@@ -210,20 +208,17 @@ def cmd_create(task_id, title, state, org, official, remark=None):
 
 
 # ── 状态流转合法性校验 ──
-# 只允许文档定义的状态路径:
-# Pending→Taizi→Zhongshu→Menxia→Assigned→Doing→Review→Done
-# 额外: Blocked 可双向切换, Cancelled 从任意非终态可达, Next→Doing
 _VALID_TRANSITIONS = {
-    'Pending':   {'Taizi', 'Cancelled'},
-    'Taizi':     {'Zhongshu', 'Cancelled'},
-    'Zhongshu':  {'Menxia', 'Cancelled'},
-    'Menxia':    {'Assigned', 'Zhongshu', 'Cancelled'},   # 封驳可回中书
-    'Assigned':  {'Doing', 'Next', 'Blocked', 'Cancelled'},
-    'Next':      {'Doing', 'Blocked', 'Cancelled'},
-    'Doing':     {'Review', 'Blocked', 'Cancelled'},
-    'Review':    {'Done', 'Menxia', 'Doing', 'Cancelled'},  # 可打回重审/重做
-    'Blocked':   {'Doing', 'Next', 'Assigned', 'Review', 'Cancelled'},  # 解除后回原位
-    'Done':      set(),       # 终态
+    'Pending':   {'Backlog', 'Cancelled'},
+    'Backlog':   {'Planning', 'Cancelled'},
+    'Planning':  {'Designing', 'Developing', 'Cancelled'},
+    'Designing': {'Developing', 'Cancelled'},
+    'Developing':{'Testing', 'Cancelled'},
+    'Testing':   {'ReadyForRelease', 'Developing', 'Cancelled'},
+    'ReadyForRelease': {'Released', 'Testing', 'Cancelled'},
+    'Released':  set(),
+    'Blocked':   {'Planning', 'Designing', 'Developing', 'Testing', 'Cancelled'},
+    'Done':      set(),       # 终态 (Fallback)
     'Cancelled': set(),       # 终态
 }
 
@@ -283,12 +278,12 @@ def cmd_done(task_id, output_path='', summary=''):
         if not t:
             log.error(f'任务 {task_id} 不存在')
             return tasks
-        t['state'] = 'Done'
+        t['state'] = 'Released'
         t['output'] = output_path
         t['now'] = summary or '任务已完成'
         t.setdefault('flow_log', []).append({
-            "at": now_iso(), "from": t.get('org', '执行部门'),
-            "to": "皇上", "remark": f"✅ 完成：{summary or '任务已完成'}"
+            "at": now_iso(), "from": t.get('org', '运维'),
+            "to": "业务方", "remark": f"✅ 完成：{summary or '任务已完成'}"
         })
         t['updatedAt'] = now_iso()
         return tasks

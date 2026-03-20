@@ -464,9 +464,9 @@ function LiveActivitySection({
   const phaseDurations = data.phaseDurations || [];
   const maxDur = Math.max(...phaseDurations.map((p) => p.durationSec || 1), 1);
   const phaseColors: Record<string, string> = {
-    '皇上': '#eab308', '太子': '#f97316', '中书省': '#3b82f6', '门下省': '#8b5cf6',
-    '尚书省': '#10b981', '六部': '#06b6d4', '礼部': '#ec4899', '户部': '#f59e0b',
-    '兵部': '#ef4444', '刑部': '#6366f1', '工部': '#14b8a6', '吏部': '#d946ef',
+    '业务方': '#eab308', 'PMO': '#f97316', '产品经理': '#3b82f6', 'UI设计师': '#8b5cf6',
+    '前端开发': '#10b981', '后端开发': '#f59e0b', '测试工程师': '#ef4444',
+    '运维工程师': '#06b6d4', '完成': '#22c55e',
   };
 
   // Todos summary
