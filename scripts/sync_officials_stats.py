@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""同步各官员统计数据 → data/officials_stats.json"""
+"""同步各成员统计数据 → data/officials_stats.json"""
 import json, pathlib, datetime, logging
 from file_lock import atomic_json_write
 
-log = logging.getLogger('officials')
+log = logging.getLogger('members')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(message)s', datefmt='%H:%M:%S')
 
 BASE = pathlib.Path(__file__).resolve().parent.parent
@@ -22,7 +22,7 @@ MODEL_PRICING = {
     'google/gemini-2.5-pro':        {'in':1.25,'out':10.0, 'cr':0,    'cw':0},
 }
 
-OFFICIALS = [
+MEMBERS = [
     {'id':'pmo',      'label':'PMO',       'role':'项目管理',  'emoji':'📋','rank':'P8'},
     {'id':'product',  'label':'产品经理',  'role':'产品经理',  'emoji':'💡','rank':'P7'},
     {'id':'ui',       'label':'UI设计师',  'role':'UI设计师',  'emoji':'🎨','rank':'P6'},
@@ -60,18 +60,11 @@ def get_model(agent_id):
     for a in cfg.get('agents',{}).get('list',[]):
         if a.get('id') == agent_id:
             return normalize_model(a.get('model', default), default)
-    # 兼容历史：太子曾使用 main 作为运行时 id
-    if agent_id == 'taizi':
-        for a in cfg.get('agents',{}).get('list',[]):
-            if a.get('id') == 'main':
-                return normalize_model(a.get('model', default), default)
     return default
 
 def scan_agent(agent_id):
     """从 sessions.json 读取 token 统计（累计所有 session）"""
     sj = AGENTS_ROOT / agent_id / 'sessions' / 'sessions.json'
-    if not sj.exists() and agent_id == 'taizi':
-        sj = AGENTS_ROOT / 'main' / 'sessions' / 'sessions.json'
     if not sj.exists():
         return {'tokens_in':0,'tokens_out':0,'cache_read':0,'cache_write':0,'sessions':0,'last_active':None,'messages':0}
     
@@ -131,7 +124,7 @@ def get_task_stats(org_label, tasks):
     active = [t for t in tasks if t.get('state') in ('Planning','Designing','Developing','Testing','ReadyForRelease') and t.get('org')==org_label]
     fl = sum(1 for t in tasks for f in t.get('flow_log',[])
              if f.get('from')==org_label or f.get('to')==org_label)
-    # 参与的旨意（JJC）或项目（PRJ）列表
+    # 参与的任务（PRJ/JJC）列表
     participated = []
     for t in tasks:
         if not (t['id'].startswith('JJC') or t['id'].startswith('PRJ')): continue
@@ -155,15 +148,15 @@ def main():
     live_tasks = live.get('tasks', [])
 
     result = []
-    for off in OFFICIALS:
-        model   = get_model(off['id'])
-        ss      = scan_agent(off['id'])
-        ts      = get_task_stats(off['label'], tasks)
-        hb      = get_hb(off['id'], live_tasks)
+    for m in MEMBERS:
+        model   = get_model(m['id'])
+        ss      = scan_agent(m['id'])
+        ts      = get_task_stats(m['label'], tasks)
+        hb      = get_hb(m['id'], live_tasks)
         cost_usd = calc_cost(ss, model)
 
         result.append({
-            **off,
+            **m,
             'model': model,
             'model_short': model.split('/')[-1] if isinstance(model, str) and '/' in model else str(model),
             'sessions': ss['sessions'],
@@ -198,12 +191,12 @@ def main():
 
     payload = {
         'generatedAt': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'officials': result,
+        'members': result,
         'totals': totals,
-        'top_official': top.get('label',''),
+        'top_member': top.get('label',''),
     }
     atomic_json_write(DATA/'officials_stats.json', payload)
-    log.info(f'{len(result)} officials | cost=¥{totals["cost_cny"]} | top={top.get("label","")}')
+    log.info(f'{len(result)} members | cost=¥{totals["cost_cny"]} | top={top.get("label","")}')
 
 if __name__ == '__main__':
     main()

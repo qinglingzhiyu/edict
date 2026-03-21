@@ -29,7 +29,7 @@ export const api = {
   liveStatus: () => fetchJ<LiveStatus>(`${API_BASE}/api/live-status`),
   agentConfig: () => fetchJ<AgentConfig>(`${API_BASE}/api/agent-config`),
   modelChangeLog: () => fetchJ<ChangeLogEntry[]>(`${API_BASE}/api/model-change-log`).catch(() => []),
-  officialsStats: () => fetchJ<OfficialsData>(`${API_BASE}/api/officials-stats`),
+  officialsStats: () => fetchJ<MembersData>(`${API_BASE}/api/officials-stats`),
   morningBrief: () => fetchJ<MorningBrief>(`${API_BASE}/api/morning-brief`),
   morningConfig: () => fetchJ<SubConfig>(`${API_BASE}/api/morning-config`),
   agentsStatus: () => fetchJ<AgentsStatusData>(`${API_BASE}/api/agents-status`),
@@ -99,10 +99,10 @@ export const api = {
     postJ<ActionResult & { taskId?: string }>(`${API_BASE}/api/create-task`, data),
 
   // ── 部门站会 ──
-  courtDiscussStart: (topic: string, officials: string[], taskId?: string) =>
-    postJ<CourtDiscussResult>(`${API_BASE}/api/court-discuss/start`, { topic, officials, taskId }),
-  courtDiscussAdvance: (sessionId: string, userMessage?: string, decree?: string) =>
-    postJ<CourtDiscussResult>(`${API_BASE}/api/court-discuss/advance`, { sessionId, userMessage, decree }),
+  courtDiscussStart: (topic: string, members: string[], taskId?: string) =>
+    postJ<CourtDiscussResult>(`${API_BASE}/api/court-discuss/start`, { topic, members, taskId }),
+  courtDiscussAdvance: (sessionId: string, userMessage?: string, event?: string) =>
+    postJ<CourtDiscussResult>(`${API_BASE}/api/court-discuss/advance`, { sessionId, userMessage, event }),
   courtDiscussConclude: (sessionId: string) =>
     postJ<ActionResult & { summary?: string }>(`${API_BASE}/api/court-discuss/conclude`, { sessionId }),
   courtDiscussDestroy: (sessionId: string) =>
@@ -205,7 +205,7 @@ export interface ChangeLogEntry {
   rolledBack?: boolean;
 }
 
-export interface OfficialInfo {
+export interface MemberInfo {
   id: string;
   label: string;
   emoji: string;
@@ -231,10 +231,10 @@ export interface OfficialInfo {
   participated_edicts: { id: string; title: string; state: string }[];
 }
 
-export interface OfficialsData {
-  officials: OfficialInfo[];
+export interface MembersData {
+  members: MemberInfo[];
   totals: { tasks_done: number; cost_cny: number };
-  top_official: string;
+  top_member: string;
 }
 
 export interface AgentStatusInfo {

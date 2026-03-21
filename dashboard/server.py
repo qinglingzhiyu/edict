@@ -25,7 +25,7 @@ from court_discuss import (
     create_session as cd_create, advance_discussion as cd_advance,
     get_session as cd_get, conclude_session as cd_conclude,
     list_sessions as cd_list, destroy_session as cd_destroy,
-    get_fate_event as cd_fate, OFFICIAL_PROFILES as CD_PROFILES,
+    get_fate_event as cd_fate, MEMBER_PROFILES as CD_PROFILES,
 )
 
 log = logging.getLogger('server')
@@ -544,7 +544,7 @@ def push_to_feishu():
         print(f'[飞书] 推送失败: {e}', file=sys.stderr)
 
 
-# 旨意标题最低要求
+# 任务标题最低要求
 _MIN_TITLE_LEN = 6
 _JUNK_TITLES = {
     '?', '？', '好', '好的', '是', '否', '不', '不是', '对', '了解', '收到',
@@ -2221,7 +2221,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({'ok': False, 'error': 'invalid agent_id'}, 400)
             else:
                 self.send_json({'ok': True, 'agentId': agent_id, 'activity': get_agent_activity(agent_id)})
-        # ── 朝堂议政 ──
+        # ── 部门站会 ──
         elif p == '/api/court-discuss/list':
             self.send_json({'ok': True, 'sessions': cd_list()})
         elif p == '/api/court-discuss/officials':
@@ -2392,7 +2392,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == '/api/task-action':
             task_id = body.get('taskId', '').strip()
             action = body.get('action', '').strip()  # stop, cancel, resume
-            reason = body.get('reason', '').strip() or f'皇上从看板{action}'
+            reason = body.get('reason', '').strip() or f'业务方从看板{action}'
             if not task_id or action not in ('stop', 'cancel', 'resume'):
                 self.send_json({'ok': False, 'error': 'taskId and action(stop/cancel/resume) required'}, 400)
                 return
@@ -2443,8 +2443,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if p == '/api/create-task':
             title = body.get('title', '').strip()
-            org = body.get('org', '中书省').strip()
-            official = body.get('official', '中书令').strip()
+            org = body.get('org', 'PMO').strip()
+            official = body.get('official', '项目经理').strip()
             priority = body.get('priority', 'normal').strip()
             template_id = body.get('templateId', '')
             params = body.get('params', {})
@@ -2526,33 +2526,33 @@ class Handler(BaseHTTPRequestHandler):
             atomic_json_update(DATA / 'agent_config.json', _set_channel, {})
             self.send_json({'ok': True, 'message': f'派发渠道已切换为 {channel}'})
 
-        # ── 朝堂议政 POST ──
+        # ── 部门站会 POST ──
         elif p == '/api/court-discuss/start':
             topic = body.get('topic', '').strip()
-            officials = body.get('officials', [])
+            members = body.get('members', [])
             task_id = body.get('taskId', '').strip()
             if not topic:
                 self.send_json({'ok': False, 'error': 'topic required'}, 400)
                 return
-            if not officials or not isinstance(officials, list):
-                self.send_json({'ok': False, 'error': 'officials list required'}, 400)
+            if not members or not isinstance(members, list):
+                self.send_json({'ok': False, 'error': 'members list required'}, 400)
                 return
-            # 校验官员 ID
+            # 校验成员 ID
             valid_ids = set(CD_PROFILES.keys())
-            officials = [o for o in officials if o in valid_ids]
-            if len(officials) < 2:
-                self.send_json({'ok': False, 'error': '至少选择2位官员'}, 400)
+            members = [o for o in members if o in valid_ids]
+            if len(members) < 2:
+                self.send_json({'ok': False, 'error': '至少选择2位成员'}, 400)
                 return
-            self.send_json(cd_create(topic, officials, task_id))
+            self.send_json(cd_create(topic, members, task_id))
 
         elif p == '/api/court-discuss/advance':
             sid = body.get('sessionId', '').strip()
             user_msg = body.get('userMessage', '').strip() or None
-            decree = body.get('decree', '').strip() or None
+            event = body.get('event', '').strip() or None
             if not sid:
                 self.send_json({'ok': False, 'error': 'sessionId required'}, 400)
                 return
-            self.send_json(cd_advance(sid, user_msg, decree))
+            self.send_json(cd_advance(sid, user_msg, event))
 
         elif p == '/api/court-discuss/conclude':
             sid = body.get('sessionId', '').strip()
@@ -2572,7 +2572,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='三省六部看板服务器')
+    parser = argparse.ArgumentParser(description='技术部门协作看板服务器')
     parser.add_argument('--port', type=int, default=7891)
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--cors', default=None, help='Allowed CORS origin (default: reflect request Origin header)')

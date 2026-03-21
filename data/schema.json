@@ -1,24 +1,20 @@
 {
   "meta": {
-    "title": "军机处",
-    "ownerTitle": "皇上",
-    "version": "v3"
+    "title": "研发看板",
+    "ownerTitle": "业务方",
+    "version": "v4"
   },
-  "states": ["Pending", "Taizi", "Zhongshu", "Menxia", "Assigned", "Next", "Doing", "Review", "Done", "Blocked", "Cancelled"],
-  "stateFlow": "Pending → Taizi → Zhongshu → Menxia → Assigned → Doing → Review → Done",
-  "terminalStates": ["Done", "Cancelled"],
+  "states": ["Inbox", "Backlog", "Planning", "Designing", "Developing", "Testing", "ReadyForRelease", "Released", "Blocked", "Cancelled"],
+  "stateFlow": "Inbox → Backlog → Planning → Designing → Developing → Testing → ReadyForRelease → Released",
+  "terminalStates": ["Released", "Cancelled"],
   "roles": {
-    "taizi": "太子",
-    "zhongshu": "中书省",
-    "menxia": "门下省",
-    "shangshu": "尚书省",
-    "hubu": "户部",
-    "libu": "礼部",
-    "bingbu": "兵部",
-    "xingbu": "刑部",
-    "gongbu": "工部",
-    "libu_hr": "吏部",
-    "zaochao": "钦天监"
+    "pmo": "PMO",
+    "product": "产品经理",
+    "ui": "UI设计师",
+    "frontend": "前端工程师",
+    "backend": "后端工程师",
+    "qa": "测试工程师",
+    "ops": "运维工程师"
   },
   "taskFields": [
     "id",

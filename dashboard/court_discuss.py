@@ -1,15 +1,14 @@
 """
-朝堂议政引擎 — 多官员实时讨论系统
+技术研讨引擎 — 多角色实时讨论系统
 
-灵感来源于 nvwa 项目的 group_chat + crew_engine
-将官员可视化 + 实时讨论 + 用户（皇帝）参与融合到三省六部
+将团队成员可视化 + 实时讨论 + 业务方参与融合到研发协作系统
 
 功能:
-  - 选择官员参与议政
-  - 围绕旨意/议题进行多轮群聊讨论
-  - 皇帝可随时发言、下旨干预（天命降临）
-  - 命运骰子：随机事件
-  - 每个官员保持自己的角色性格和说话风格
+  - 选择成员参与讨论
+  - 围绕需求/议题进行多轮群聊讨论
+  - 业务方可随时发言、干预讨论
+  - 命运骰子：随机技术/业务事件
+  - 每个成员保持自己的专业背景和说话风格
 """
 
 import json
@@ -18,11 +17,11 @@ import os
 import time
 import uuid
 
-logger = logging.getLogger('court_discuss')
+logger = logging.getLogger('tech_discuss')
 
 # ── 团队角色设定 ──
 
-OFFICIAL_PROFILES = {
+MEMBER_PROFILES = {
     'pmo': {
         'name': 'PMO', 'emoji': '📋', 'role': '项目管理',
         'duty': '项目全生命周期管理、资源协调与进度管控。负责需求分拣、立项及最终上线确认。',
@@ -56,7 +55,7 @@ OFFICIAL_PROFILES = {
     'qa': {
         'name': '测试工程师', 'emoji': '🧪', 'role': '质量保证',
         'duty': '功能测试、性能测试与自动化测试。负责发布前的质量把控与回归验证。',
-        'personality': '细心、挑剔，善于发现隐藏的边界问题和潜在风险。',
+        'personality': '细心、挑ickt，善于发现隐藏的边界问题和潜在风险。',
         'speaking_style': '常说"边界条件"、"回归测试"、"压测数据"、"不通过"。'
     },
     'ops': {
@@ -93,24 +92,24 @@ FATE_EVENTS = [
 _sessions: dict[str, dict] = {}
 
 
-def create_session(topic: str, official_ids: list[str], task_id: str = '') -> dict:
-    """创建新的朝堂议政会话。"""
+def create_session(topic: str, member_ids: list[str], task_id: str = '') -> dict:
+    """创建新的技术研讨会话。"""
     session_id = str(uuid.uuid4())[:8]
 
-    officials = []
-    for oid in official_ids:
-        profile = OFFICIAL_PROFILES.get(oid)
+    members = []
+    for mid in member_ids:
+        profile = MEMBER_PROFILES.get(mid)
         if profile:
-            officials.append({**profile, 'id': oid})
+            members.append({**profile, 'id': mid})
 
-    if not officials:
-        return {'ok': False, 'error': '至少选择一位官员'}
+    if not members:
+        return {'ok': False, 'error': '至少选择一位成员'}
 
     session = {
         'session_id': session_id,
         'topic': topic,
         'task_id': task_id,
-        'officials': officials,
+        'members': members,
         'messages': [{
             'type': 'system',
             'content': f'🏛 部门站会开始 —— 议题：{topic}',
@@ -126,7 +125,7 @@ def create_session(topic: str, official_ids: list[str], task_id: str = '') -> di
 
 
 def advance_discussion(session_id: str, user_message: str = None,
-                       decree: str = None) -> dict:
+                       event: str = None) -> dict:
     """推进一轮讨论，使用内置模拟或 LLM。"""
     session = _sessions.get(session_id)
     if not session:
@@ -138,36 +137,36 @@ def advance_discussion(session_id: str, user_message: str = None,
     # 记录业务方发言
     if user_message:
         session['messages'].append({
-            'type': 'emperor',
+            'type': 'business',
             'content': user_message,
             'timestamp': time.time(),
         })
 
     # 记录突发事件
-    if decree:
+    if event:
         session['messages'].append({
-            'type': 'decree',
-            'content': decree,
+            'type': 'event',
+            'content': event,
             'timestamp': time.time(),
         })
 
     # 尝试用 LLM 生成讨论
-    llm_result = _llm_discuss(session, user_message, decree)
+    llm_result = _llm_discuss(session, user_message, event)
 
     if llm_result:
         new_messages = llm_result.get('messages', [])
         scene_note = llm_result.get('scene_note')
     else:
         # 降级到规则模拟
-        new_messages = _simulated_discuss(session, user_message, decree)
+        new_messages = _simulated_discuss(session, user_message, event)
         scene_note = None
 
     # 添加到历史
     for msg in new_messages:
         session['messages'].append({
-            'type': 'official',
-            'official_id': msg.get('official_id', ''),
-            'official_name': msg.get('name', ''),
+            'type': 'member',
+            'member_id': msg.get('member_id', ''),
+            'member_name': msg.get('name', ''),
             'content': msg.get('content', ''),
             'emotion': msg.get('emotion', 'neutral'),
             'action': msg.get('action'),
@@ -199,7 +198,7 @@ def get_session(session_id: str) -> dict | None:
 
 
 def conclude_session(session_id: str) -> dict:
-    """结束议政，生成总结。"""
+    """结束研讨，生成总结。"""
     session = _sessions.get(session_id)
     if not session:
         return {'ok': False, 'error': f'会话 {session_id} 不存在'}
@@ -210,10 +209,10 @@ def conclude_session(session_id: str) -> dict:
     summary = _llm_summarize(session)
     if not summary:
         # 降级到简单统计
-        official_msgs = [m for m in session['messages'] if m['type'] == 'official']
+        member_msgs = [m for m in session['messages'] if m['type'] == 'member']
         by_name = {}
-        for m in official_msgs:
-            name = m.get('official_name', '?')
+        for m in member_msgs:
+            name = m.get('member_name', '?')
             by_name[name] = by_name.get(name, 0) + 1
         parts = [f"{n}发言{c}次" for n, c in by_name.items()]
         summary = f"历经{session['round']}轮讨论，{'、'.join(parts)}。议题待后续落实。"
@@ -240,7 +239,7 @@ def list_sessions() -> list[dict]:
             'topic': s['topic'],
             'round': s['round'],
             'phase': s['phase'],
-            'official_count': len(s['officials']),
+            'member_count': len(s['members']),
             'message_count': len(s['messages']),
         }
         for s in _sessions.values()
@@ -320,7 +319,7 @@ def _get_llm_config() -> dict | None:
     if copilot_token:
         # 选一个 copilot 支持的模型
         model = 'gpt-4o'
-        logger.info('Court discuss using github-copilot token, model=%s', model)
+        logger.info('Tech discuss using github-copilot token, model=%s', model)
         return {
             'api_key': copilot_token,
             'base_url': 'https://api.githubcopilot.com',
@@ -375,7 +374,7 @@ def _get_llm_config() -> dict | None:
                     logger.info('Skipping provider=%s (not reachable)', name)
                     continue
 
-            logger.info('Court discuss using openclaw provider=%s model=%s api=%s', name, model_id, api_type)
+            logger.info('Tech discuss using openclaw provider=%s model=%s api=%s', name, model_id, api_type)
             send_auth = prov.get('authHeader', True) is not False and api_key not in ('', 'n/a')
             return {
                 'api_key': api_key if send_auth else '',
@@ -457,13 +456,13 @@ def _llm_complete(system_prompt: str, user_prompt: str, max_tokens: int = 1024) 
             return None
 
 
-def _llm_discuss(session: dict, user_message: str = None, decree: str = None) -> dict | None:
-    """使用 LLM 生成多官员讨论。"""
-    officials = session['officials']
-    names = '、'.join(o['name'] for o in officials)
+def _llm_discuss(session: dict, user_message: str = None, event: str = None) -> dict | None:
+    """使用 LLM 生成多成员讨论。"""
+    members = session['members']
+    names = '、'.join(o['name'] for o in members)
 
     profiles = ''
-    for o in officials:
+    for o in members:
         profiles += f"\n### {o['name']}（{o['role']}）\n"
         profiles += f"职责范围：{o.get('duty', '综合事务')}\n"
         profiles += f"性格：{o['personality']}\n"
@@ -474,23 +473,23 @@ def _llm_discuss(session: dict, user_message: str = None, decree: str = None) ->
     for msg in session['messages'][-20:]:
         if msg['type'] == 'system':
             history += f"\n【系统】{msg['content']}\n"
-        elif msg['type'] == 'emperor':
+        elif msg['type'] == 'business':
             history += f"\n业务方：{msg['content']}\n"
-        elif msg['type'] == 'decree':
+        elif msg['type'] == 'event':
             history += f"\n【突发事件】{msg['content']}\n"
-        elif msg['type'] == 'official':
-            history += f"\n{msg.get('official_name', '?')}：{msg['content']}\n"
+        elif msg['type'] == 'member':
+            history += f"\n{msg.get('member_name', '?')}：{msg['content']}\n"
         elif msg['type'] == 'scene_note':
             history += f"\n（{msg['content']}）\n"
 
     if user_message:
         history += f"\n业务方：{user_message}\n"
-    if decree:
-        history += f"\n【突发事件——上帝视角干预】{decree}\n"
+    if event:
+        history += f"\n【突发事件】{event}\n"
 
-    decree_section = ''
-    if decree:
-        decree_section = '\n请根据突发事件改变讨论走向，所有成员都必须对此做出反应。\n'
+    event_section = ''
+    if event:
+        event_section = '\n请根据突发事件改变讨论走向，所有成员都必须对此做出反应。\n'
 
     prompt = f"""你是一个技术部门多角色实时站会模拟器。模拟多位团队成员在会议上围绕议题的讨论。
 
@@ -505,7 +504,7 @@ def _llm_discuss(session: dict, user_message: str = None, decree: str = None) ->
 
 ## 对话记录
 {history if history else '（讨论刚刚开始）'}
-{decree_section}
+{event_section}
 ## 任务
 生成每位成员的下一条发言。要求：
 1. 每位成员说1-3句话，像真实技术会议讨论一样
@@ -519,10 +518,10 @@ def _llm_discuss(session: dict, user_message: str = None, decree: str = None) ->
 输出JSON格式：
 {{
   "messages": [
-    {{"official_id": "zhongshu", "name": "中书令", "content": "发言内容", "emotion": "neutral|confident|worried|angry|thinking|amused", "action": "可选动作描写"}},
+    {{"member_id": "pmo", "name": "PMO", "content": "发言内容", "emotion": "neutral|confident|worried|angry|thinking|amused", "action": "可选动作描写"}},
     ...
   ],
-  "scene_note": "可选的朝堂氛围变化（如：朝堂一片哗然|群臣窃窃私语），没有则为null"
+  "scene_note": "可选的会议氛围变化（如：大家陷入沉思|讨论变得激烈），没有则为null"
 }}
 
 只输出JSON，不要其他内容。"""
@@ -551,15 +550,15 @@ def _llm_discuss(session: dict, user_message: str = None, decree: str = None) ->
 
 def _llm_summarize(session: dict) -> str | None:
     """用 LLM 总结讨论结果。"""
-    official_msgs = [m for m in session['messages'] if m['type'] == 'official']
+    member_msgs = [m for m in session['messages'] if m['type'] == 'member']
     topic = session['topic']
 
-    if not official_msgs:
+    if not member_msgs:
         return None
 
     dialogue = '\n'.join(
-        f"{m.get('official_name', '?')}：{m['content']}"
-        for m in official_msgs[-30:]
+        f"{m.get('member_name', '?')}：{m['content']}"
+        for m in member_msgs[-30:]
     )
 
     prompt = f"""以下是技术部门各岗位成员围绕「{topic}」的讨论记录：
@@ -614,30 +613,30 @@ _SIMULATED_RESPONSES = {
 import random
 
 
-def _simulated_discuss(session: dict, user_message: str = None, decree: str = None) -> list[dict]:
+def _simulated_discuss(session: dict, user_message: str = None, event: str = None) -> list[dict]:
     """无 LLM 时的规则生成讨论内容。"""
-    officials = session['officials']
+    members = session['members']
     messages = []
 
-    for o in officials:
-        oid = o['id']
-        pool = _SIMULATED_RESPONSES.get(oid, [])
+    for o in members:
+        mid = o['id']
+        pool = _SIMULATED_RESPONSES.get(mid, [])
         if isinstance(pool, set):
             pool = list(pool)
         if not pool:
-            pool = ['臣附议。', '臣有不同看法。', '臣需要再想想。']
+            pool = ['我支持这个方案。', '我有一些不同看法。', '我们需要更多数据支持。']
 
         content = random.choice(pool)
         emotions = ['neutral', 'confident', 'thinking', 'amused', 'worried']
 
         # 如果业务方发言了或有突发事件，调整回应
-        if decree:
-            content = f'*面露惊色* 突发事件，{content}'
+        if event:
+            content = f'*查阅紧急通知* 针对突发事件，{content}'
         elif user_message:
-            content = f'好的，{content}'
+            content = f'收到业务反馈，{content}'
 
         messages.append({
-            'official_id': oid,
+            'member_id': mid,
             'name': o['name'],
             'content': content,
             'emotion': random.choice(emotions),
@@ -653,8 +652,9 @@ def _serialize(session: dict) -> dict:
         'session_id': session['session_id'],
         'topic': session['topic'],
         'task_id': session.get('task_id', ''),
-        'officials': session['officials'],
+        'members': session['members'],
         'messages': session['messages'],
         'round': session['round'],
         'phase': session['phase'],
     }
+
