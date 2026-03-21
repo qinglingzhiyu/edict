@@ -31,7 +31,19 @@ from court_discuss import (
 log = logging.getLogger('server')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(message)s', datefmt='%H:%M:%S')
 
+BASE = pathlib.Path(__file__).parent
+DIST = BASE / 'dist'          # React 构建产物 (npm run build)
+DATA = BASE.parent / "data"
+SCRIPTS = BASE.parent / 'scripts'
+
 OCLAW_HOME = pathlib.Path.home() / '.openclaw'
+OC_STATE_DIR = BASE.parent / 'openclaw_state'
+OC_CONFIG_PATH = os.environ.get('OPENCLAW_CONFIG_PATH')
+if OC_CONFIG_PATH:
+    OC_CONFIG_PATH = pathlib.Path(OC_CONFIG_PATH)
+else:
+    OC_CONFIG_PATH = OC_STATE_DIR / 'openclaw.json'
+
 MAX_REQUEST_BODY = 1 * 1024 * 1024  # 1 MB
 ALLOWED_ORIGIN = None  # Set via --cors; None means restrict to localhost
 _DEFAULT_ORIGINS = {
@@ -40,10 +52,66 @@ _DEFAULT_ORIGINS = {
 }
 _SAFE_NAME_RE = re.compile(r'^[a-zA-Z0-9_\-\u4e00-\u9fff]+$')
 
-BASE = pathlib.Path(__file__).parent
-DIST = BASE / 'dist'          # React 构建产物 (npm run build)
-DATA = BASE.parent / "data"
-SCRIPTS = BASE.parent / 'scripts'
+
+def _ensure_openclaw_runtime_config():
+    """确保 openclaw 在本项目内有可用配置与身份文件。"""
+    OC_STATE_DIR.mkdir(parents=True, exist_ok=True)
+
+    if OC_CONFIG_PATH.exists():
+        return
+
+    cfg = {}
+    cfg_candidates = [
+        OCLAW_HOME / 'openclaw.json',
+        OCLAW_HOME / 'openclaw.json.bak',
+        OCLAW_HOME / 'openclaw.json.bak.1',
+        OCLAW_HOME / 'openclaw.json.bak.2',
+        OCLAW_HOME / 'openclaw.json.bak.3',
+        OCLAW_HOME / 'openclaw.json.bak.4',
+    ]
+    for c in cfg_candidates:
+        try:
+            if c.exists() and not c.is_symlink():
+                cfg = read_json(c, {})
+                if isinstance(cfg, dict) and cfg:
+                    break
+        except Exception:
+            continue
+
+    if not cfg:
+        agent_cfg = read_json(DATA / 'agent_config.json', {})
+        default_model = agent_cfg.get('defaultModel') or 'alibailian/qwen3-max-2026-01-23'
+        cfg = {
+            'agents': {
+                'defaults': {
+                    'model': {'primary': default_model},
+                    'workspace': str(pathlib.Path.home() / '.openclaw/workspace')
+                },
+                'list': [{'id': 'main'}]
+            },
+            'gateway': {'port': 18789, 'mode': 'local', 'bind': 'loopback'}
+        }
+        for ag in agent_cfg.get('agents', []):
+            ag_id = (ag.get('id') or '').strip()
+            if not ag_id:
+                continue
+            cfg['agents']['list'].append({
+                'id': ag_id,
+                'name': ag_id,
+                'workspace': ag.get('workspace') or str(pathlib.Path.home() / f'.openclaw/workspace-{ag_id}'),
+                'agentDir': str(pathlib.Path.home() / f'.openclaw/agents/{ag_id}/agent'),
+                'subagents': {'allowAgents': ag.get('allowAgents', [])}
+            })
+
+    atomic_json_write(OC_CONFIG_PATH, cfg)
+
+
+def _openclaw_env():
+    """为 openclaw 子进程构建运行环境。"""
+    _ensure_openclaw_runtime_config()
+    env = os.environ.copy()
+    env['OPENCLAW_CONFIG_PATH'] = str(OC_CONFIG_PATH)
+    return env
 
 # 静态资源 MIME 类型
 _MIME_TYPES = {
@@ -635,11 +703,13 @@ def handle_review_action(task_id, action, comment=''):
     if action == 'approve':
         if task['state'] == 'Testing':
             task['state'] = 'ReadyForRelease'
+            task['org'] = '运维'
             task['now'] = '测试评审通过，移交运维准备发布'
             remark = f'✅ 通过：{comment or "评审通过"}'
             to_dept = '运维'
         else:  # ReadyForRelease
             task['state'] = 'Released'
+            task['org'] = '业务方'
             task['now'] = '发布评审通过，任务完成'
             remark = f'✅ 评审通过：{comment or "发布成功"}'
             to_dept = '业务方'
@@ -647,6 +717,7 @@ def handle_review_action(task_id, action, comment=''):
         round_num = (task.get('review_round') or 0) + 1
         task['review_round'] = round_num
         task['state'] = 'Developing'
+        task['org'] = '研发'
         task['now'] = f'驳回并退回研发修订（第{round_num}轮）'
         remark = f'🚫 驳回：{comment or "需要修改"}'
         to_dept = '研发'
@@ -854,7 +925,7 @@ def wake_agent(agent_id, message=''):
             log.info(f'🔔 唤醒 {agent_id}...')
             # 带重试（最多2次）
             for attempt in range(1, 3):
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=130)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=130, env=_openclaw_env())
                 if result.returncode == 0:
                     log.info(f'✅ {agent_id} 已唤醒')
                     return
@@ -880,13 +951,14 @@ _STATE_AGENT_MAP = {
     'Backlog': 'pmo',
     'Planning': 'product',
     'Designing': 'ui',
-    'Developing': None,
+    'Developing': 'frontend', # 默认进入前端，后续由 progress_log 动态判定
     'Testing': 'qa',
     'ReadyForRelease': 'ops',
 }
 _ORG_AGENT_MAP = {
-    'PMO': 'pmo', '产品': 'product', 'UI': 'ui',
-    '前端': 'frontend', '后端': 'backend', '测试': 'qa', '运维': 'ops',
+    'PMO': 'pmo', '产品': 'product', '产品经理': 'product', 'UI': 'ui', 'UI设计师': 'ui',
+    '前端': 'frontend', '前端工程师': 'frontend', '后端': 'backend', '后端工程师': 'backend',
+    '研发': 'frontend', '测试': 'qa', '测试工程师': 'qa', '运维': 'ops', '运维工程师': 'ops',
 }
 
 _TERMINAL_STATES = {'Done', 'Released', 'Cancelled'}
@@ -1996,7 +2068,7 @@ def dispatch_for_state(task_id, task, new_state, trigger='state-transition'):
             err = ''
             for attempt in range(1, max_retries + 1):
                 log.info(f'🔄 自动派发 {task_id} → {agent_id} (第{attempt}次)...')
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=310)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=310, env=_openclaw_env())
                 if result.returncode == 0:
                     log.info(f'✅ {task_id} 自动派发成功 → {agent_id}')
                     _update_task_scheduler(task_id, lambda t, s: (
@@ -2040,13 +2112,14 @@ def dispatch_for_state(task_id, task, new_state, trigger='state-transition'):
             ))
         except Exception as e:
             log.warning(f'⚠️ {task_id} 自动派发异常: {e}')
+            err_text = str(e)[:200]
             _update_task_scheduler(task_id, lambda t, s: (
                 s.update({
                     'lastDispatchAt': now_iso(),
                     'lastDispatchStatus': 'error',
                     'lastDispatchAgent': agent_id,
                     'lastDispatchTrigger': trigger,
-                    'lastDispatchError': str(e)[:200],
+                    'lastDispatchError': err_text,
                 }),
                 _scheduler_add_flow(t, f'派发异常：{agent_id}（{trigger}）', to=t.get('org', ''))
             ))
@@ -2070,6 +2143,7 @@ def handle_advance_state(task_id, comment=''):
     remark = comment or default_remark
 
     task['state'] = next_state
+    task['org'] = to_dept
     task['now'] = f'⬇️ 手动推进：{remark}'
     task.setdefault('flow_log', []).append({
         'at': now_iso(),

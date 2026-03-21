@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useStore, STATE_LABEL } from '../store';
+import { OfficialInfo } from '../api';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -20,13 +21,13 @@ export default function MemberPanel() {
 
   const members = membersData.members;
   const totals = membersData.totals || { tasks_done: 0, cost_cny: 0 };
-  const maxTk = Math.max(...members.map((o) => o.tokens_in + o.tokens_out + o.cache_read + o.cache_write), 1);
+  const maxTk = Math.max(...members.map((o: OfficialInfo) => o.tokens_in + o.tokens_out + o.cache_read + o.cache_write), 1);
 
   // Active members
-  const alive = members.filter((o) => o.heartbeat?.status === 'active');
+  const alive = members.filter((o: OfficialInfo) => o.heartbeat?.status === 'active');
 
   // Selected member detail
-  const sel = members.find((o) => o.id === (selectedMember || members[0]?.id));
+  const sel = members.find((o: OfficialInfo) => o.id === (selectedMember || members[0]?.id));
   const selId = sel?.id || members[0]?.id;
 
   return (
@@ -35,7 +36,7 @@ export default function MemberPanel() {
       {alive.length > 0 && (
         <div className="off-activity">
           <span>🟢 当前活跃：</span>
-          {alive.map((o) => (
+          {alive.map((o: OfficialInfo) => (
             <span key={o.id} style={{ fontSize: 12 }}>{o.emoji} {o.role}</span>
           ))}
           <span style={{ color: 'var(--muted)', fontSize: 11, marginLeft: 'auto' }}>其余成员待命</span>
@@ -69,7 +70,7 @@ export default function MemberPanel() {
         {/* Left: Ranklist */}
         <div className="off-ranklist">
           <div className="orl-hdr">贡献排行</div>
-          {members.map((o) => {
+          {members.map((o: OfficialInfo) => {
             const hb = o.heartbeat || { status: 'idle' };
             return (
               <div
@@ -202,7 +203,7 @@ function MemberDetail({
           <div style={{ fontSize: 12, color: 'var(--muted)', padding: '8px 0' }}>暂无任务记录</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {edicts.map((e) => (
+            {edicts.map((e: any) => (
               <div
                 key={e.id}
                 style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--line)' }}

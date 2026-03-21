@@ -3,7 +3,7 @@
 同步 openclaw.json 中的 agent 配置 → data/agent_config.json
 支持自动发现 agent workspace 下的 Skills 目录
 """
-import json, pathlib, datetime, logging
+import json, pathlib, datetime, logging, os
 from file_lock import atomic_json_write
 
 log = logging.getLogger('sync_agent_config')
@@ -12,7 +12,18 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(message
 # Auto-detect project root (parent of scripts/)
 BASE = pathlib.Path(__file__).parent.parent
 DATA = BASE / 'data'
-OPENCLAW_CFG = pathlib.Path.home() / '.openclaw' / 'openclaw.json'
+
+# Resolve config path with priority: ENV > Project Local > Home default
+OPENCLAW_CFG = os.environ.get('OPENCLAW_CONFIG_PATH')
+if OPENCLAW_CFG:
+    OPENCLAW_CFG = pathlib.Path(OPENCLAW_CFG)
+else:
+    # Try project local first
+    local_cfg = BASE / 'openclaw_state' / 'openclaw.json'
+    if local_cfg.exists():
+        OPENCLAW_CFG = local_cfg
+    else:
+        OPENCLAW_CFG = pathlib.Path.home() / '.openclaw' / 'openclaw.json'
 
 ID_LABEL = {
     'pmo':      {'label': 'PMO',      'role': '项目管理', 'duty': '整体进度与资源协调', 'emoji': '📅'},
@@ -195,38 +206,45 @@ def sync_scripts_to_workspaces():
         return
     synced = 0
     for proj_name, runtime_id in _SOUL_DEPLOY_MAP.items():
-        ws_scripts = pathlib.Path.home() / f'.openclaw/workspace-{runtime_id}' / 'scripts'
-        ws_scripts.mkdir(parents=True, exist_ok=True)
+        try:
+            ws_scripts = pathlib.Path.home() / f'.openclaw/workspace-{runtime_id}' / 'scripts'
+            ws_scripts.mkdir(parents=True, exist_ok=True)
+            for src_file in scripts_src.iterdir():
+                if src_file.suffix not in ('.py', '.sh') or src_file.stem.startswith('__'):
+                    continue
+                dst_file = ws_scripts / src_file.name
+                try:
+                    src_text = src_file.read_bytes()
+                except Exception:
+                    continue
+                try:
+                    dst_text = dst_file.read_bytes() if dst_file.exists() else b''
+                except Exception:
+                    dst_text = b''
+                if src_text != dst_text:
+                    dst_file.write_bytes(src_text)
+                    synced += 1
+        except Exception as e:
+            log.debug(f'Skip sync to {runtime_id}: {e}')
+
+    # also sync to workspace-main for legacy compatibility
+    try:
+        ws_main_scripts = pathlib.Path.home() / '.openclaw/workspace-main/scripts'
+        ws_main_scripts.mkdir(parents=True, exist_ok=True)
         for src_file in scripts_src.iterdir():
             if src_file.suffix not in ('.py', '.sh') or src_file.stem.startswith('__'):
                 continue
-            dst_file = ws_scripts / src_file.name
+            dst_file = ws_main_scripts / src_file.name
             try:
                 src_text = src_file.read_bytes()
-            except Exception:
-                continue
-            try:
                 dst_text = dst_file.read_bytes() if dst_file.exists() else b''
+                if src_text != dst_text:
+                    dst_file.write_bytes(src_text)
+                    synced += 1
             except Exception:
-                dst_text = b''
-            if src_text != dst_text:
-                dst_file.write_bytes(src_text)
-                synced += 1
-    # also sync to workspace-main for legacy compatibility
-    ws_main_scripts = pathlib.Path.home() / '.openclaw/workspace-main/scripts'
-    ws_main_scripts.mkdir(parents=True, exist_ok=True)
-    for src_file in scripts_src.iterdir():
-        if src_file.suffix not in ('.py', '.sh') or src_file.stem.startswith('__'):
-            continue
-        dst_file = ws_main_scripts / src_file.name
-        try:
-            src_text = src_file.read_bytes()
-            dst_text = dst_file.read_bytes() if dst_file.exists() else b''
-            if src_text != dst_text:
-                dst_file.write_bytes(src_text)
-                synced += 1
-        except Exception:
-            pass
+                pass
+    except Exception:
+        pass
     if synced:
         log.info(f'{synced} script files synced to workspaces')
 
@@ -236,23 +254,26 @@ def deploy_soul_files():
     agents_dir = BASE / 'agents'
     deployed = 0
     for proj_name, runtime_id in _SOUL_DEPLOY_MAP.items():
-        src = agents_dir / proj_name / 'SOUL.md'
-        if not src.exists():
-            continue
-        ws_dst = pathlib.Path.home() / f'.openclaw/workspace-{runtime_id}' / 'soul.md'
-        ws_dst.parent.mkdir(parents=True, exist_ok=True)
-        # 只在内容不同时更新（避免不必要的写入）
-        src_text = src.read_text(encoding='utf-8', errors='ignore')
         try:
-            dst_text = ws_dst.read_text(encoding='utf-8', errors='ignore')
-        except FileNotFoundError:
-            dst_text = ''
-        if src_text != dst_text:
-            ws_dst.write_text(src_text, encoding='utf-8')
-            deployed += 1
-        # 确保 sessions 目录存在
-        sess_dir = pathlib.Path.home() / f'.openclaw/agents/{runtime_id}/sessions'
-        sess_dir.mkdir(parents=True, exist_ok=True)
+            src = agents_dir / proj_name / 'SOUL.md'
+            if not src.exists():
+                continue
+            ws_dst = pathlib.Path.home() / f'.openclaw/workspace-{runtime_id}' / 'soul.md'
+            ws_dst.parent.mkdir(parents=True, exist_ok=True)
+            # 只在内容不同时更新（避免不必要的写入）
+            src_text = src.read_text(encoding='utf-8', errors='ignore')
+            try:
+                dst_text = ws_dst.read_text(encoding='utf-8', errors='ignore')
+            except FileNotFoundError:
+                dst_text = ''
+            if src_text != dst_text:
+                ws_dst.write_text(src_text, encoding='utf-8')
+                deployed += 1
+            # 确保 sessions 目录存在
+            sess_dir = pathlib.Path.home() / f'.openclaw/agents/{runtime_id}/sessions'
+            sess_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            log.debug(f'Skip deploy to {runtime_id}: {e}')
     if deployed:
         log.info(f'{deployed} SOUL.md files deployed')
 

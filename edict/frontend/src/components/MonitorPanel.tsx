@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useStore, DEPTS, isEdict, stateLabel } from '../store';
+import { useStore, DEPTS, isEdict, stateLabel, isActiveTask, getDeptTasks } from '../store';
 import { api, type OfficialInfo } from '../api';
 
 export default function MonitorPanel() {
@@ -19,8 +19,8 @@ export default function MonitorPanel() {
 
   // Build official map
   const offMap: Record<string, OfficialInfo> = {};
-  if (officialsData?.officials) {
-    officialsData.officials.forEach((o) => { offMap[o.id] = o; });
+  if (officialsData?.members) {
+    officialsData.members.forEach((o: OfficialInfo) => { offMap[o.id] = o; });
   }
 
   // Agent wake
@@ -112,8 +112,8 @@ export default function MonitorPanel() {
       {/* Duty Grid */}
       <div className="duty-grid">
         {DEPTS.map((d) => {
-          const myTasks = activeTasks.filter((t) => t.org === d.label);
-          const isActive = myTasks.some((t) => t.state === 'Doing');
+          const myTasks = getDeptTasks(d.id, tasks);
+          const isActive = myTasks.some(isActiveTask);
           const isBlocked = myTasks.some((t) => t.state === 'Blocked');
           const off = offMap[d.id];
           const hb = off?.heartbeat || { status: 'idle', label: '⚪' };

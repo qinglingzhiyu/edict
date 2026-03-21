@@ -69,6 +69,25 @@ export function isArchived(t: Task): boolean {
   return t.archived || ['Done', 'Released', 'Cancelled'].includes(t.state);
 }
 
+export function isActiveTask(t: Task): boolean {
+  return isEdict(t) && !isArchived(t) && !['Inbox', 'Pending', 'Next'].includes(t.state);
+}
+
+export function getDeptTasks(deptId: string, tasks: Task[]): Task[] {
+  const d = DEPTS.find(x => x.id === deptId);
+  if (!d) return [];
+  return tasks.filter((t) => {
+    if (!isEdict(t)) return false;
+    // 1. 直接匹配部门标签
+    if (t.org === d.label) return true;
+    // 2. 简称/前缀匹配 (如 "研发" 匹配 前端/后端)
+    if (d.role.includes(t.org) || d.label.startsWith(t.org) || (t.org === '研发' && (d.id === 'frontend' || d.id === 'backend'))) return true;
+    // 3. 动态匹配：如果该 Agent 在 progress_log 中有记录
+    if (t.progress_log?.some((p: any) => p.agent === d.id)) return true;
+    return false;
+  });
+}
+
 export type PipeStatus = { key: string; dept: string; icon: string; action: string; status: 'done' | 'active' | 'pending' };
 
 export function getPipeStatus(t: Task): PipeStatus[] {

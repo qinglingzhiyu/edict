@@ -138,6 +138,16 @@ export interface Heartbeat {
   label: string;
 }
 
+export interface ProgressLogEntry {
+  at: string;
+  agent: string;
+  agentLabel: string;
+  text: string;
+  todos?: TodoItem[];
+  state: string;
+  org: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -151,6 +161,7 @@ export interface Task {
   heartbeat: Heartbeat;
   flow_log: FlowEntry[];
   todos: TodoItem[];
+  progress_log?: ProgressLogEntry[];
   review_round: number;
   archived: boolean;
   archivedAt?: string;
@@ -231,11 +242,15 @@ export interface MemberInfo {
   participated_edicts: { id: string; title: string; state: string }[];
 }
 
+export type OfficialInfo = MemberInfo;
+
 export interface MembersData {
   members: MemberInfo[];
   totals: { tasks_done: number; cost_cny: number };
   top_member: string;
 }
+
+export type OfficialsData = MembersData;
 
 export interface AgentStatusInfo {
   id: string;

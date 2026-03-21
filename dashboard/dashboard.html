@@ -1166,7 +1166,8 @@ function renderMonitor(tasks){
     const recentEdict = tasks.filter(t=>isEdict(t))
       .find(t=>(t.flow_log||[]).some(f=>f.from===d.label||f.to===d.label));
 
-    const isActive = myTasks.some(t=>t.state==='Doing' || t.state==='Developing' || t.state==='Testing');
+    // 活跃定义：有非完成状态的任务（不仅限于 Doing/Developing/Testing）
+    const isActive = myTasks.length > 0;
     const isBlocked = myTasks.some(t=>t.state==='Blocked');
     const off = offMap[d.id]||{};
     const hb = off.heartbeat||{status:'idle',label:'⚪'};

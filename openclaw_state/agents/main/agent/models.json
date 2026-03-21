@@ -1,0 +1,29 @@
+{
+  "providers": {
+    "alibailian": {
+      "baseUrl": "https://coding.dashscope.aliyuncs.com/apps/anthropic",
+      "apiKey": "sk-sp-862a1d1cdd9d42f39abe0c865e739865",
+      "api": "anthropic-messages",
+      "models": [
+        {
+          "id": "qwen3-max-2026-01-23",
+          "name": "qwen3-max-2026-01-23",
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": false,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 200000,
+          "maxTokens": 8192,
+          "api": "anthropic-messages"
+        }
+      ]
+    }
+  }
+}

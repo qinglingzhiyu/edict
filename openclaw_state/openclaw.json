@@ -1,0 +1,163 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.3.13",
+    "lastTouchedAt": "2026-03-21T05:28:48.228Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-03-21T01:52:55.691Z",
+    "lastRunVersion": "2026.3.13",
+    "lastRunCommand": "onboard",
+    "lastRunMode": "local"
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "alibailian": {
+        "baseUrl": "https://coding.dashscope.aliyuncs.com/apps/anthropic",
+        "apiKey": "sk-sp-862a1d1cdd9d42f39abe0c865e739865",
+        "api": "anthropic-messages",
+        "models": [
+          {
+            "id": "qwen3-max-2026-01-23",
+            "name": "qwen3-max-2026-01-23",
+            "input": [
+              "text",
+              "image"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "alibailian/"
+      },
+      "workspace": "/Users/chentianyu/.openclaw/workspace"
+    },
+    "list": [
+      {
+        "id": "main"
+      },
+      {
+        "id": "pmo",
+        "name": "pmo",
+        "workspace": "/Users/chentianyu/.openclaw/workspace-pmo",
+        "agentDir": "/Users/chentianyu/.openclaw/agents/pmo/agent",
+        "subagents": {
+          "allowAgents": [
+            "product"
+          ]
+        }
+      },
+      {
+        "id": "product",
+        "name": "product",
+        "workspace": "/Users/chentianyu/.openclaw/workspace-product",
+        "agentDir": "/Users/chentianyu/.openclaw/agents/product/agent",
+        "subagents": {
+          "allowAgents": [
+            "pmo",
+            "ui",
+            "frontend",
+            "backend",
+            "qa"
+          ]
+        }
+      },
+      {
+        "id": "ui",
+        "name": "ui",
+        "workspace": "/Users/chentianyu/.openclaw/workspace-ui",
+        "agentDir": "/Users/chentianyu/.openclaw/agents/ui/agent",
+        "subagents": {
+          "allowAgents": [
+            "product",
+            "frontend"
+          ]
+        }
+      },
+      {
+        "id": "frontend",
+        "name": "frontend",
+        "workspace": "/Users/chentianyu/.openclaw/workspace-frontend",
+        "agentDir": "/Users/chentianyu/.openclaw/agents/frontend/agent",
+        "subagents": {
+          "allowAgents": [
+            "product",
+            "backend",
+            "qa"
+          ]
+        }
+      },
+      {
+        "id": "backend",
+        "name": "backend",
+        "workspace": "/Users/chentianyu/.openclaw/workspace-backend",
+        "agentDir": "/Users/chentianyu/.openclaw/agents/backend/agent",
+        "subagents": {
+          "allowAgents": [
+            "product",
+            "frontend",
+            "qa"
+          ]
+        }
+      },
+      {
+        "id": "qa",
+        "name": "qa",
+        "workspace": "/Users/chentianyu/.openclaw/workspace-qa",
+        "agentDir": "/Users/chentianyu/.openclaw/agents/qa/agent",
+        "subagents": {
+          "allowAgents": [
+            "product",
+            "frontend",
+            "backend",
+            "ops"
+          ]
+        }
+      },
+      {
+        "id": "ops",
+        "name": "ops",
+        "workspace": "/Users/chentianyu/.openclaw/workspace-ops",
+        "agentDir": "/Users/chentianyu/.openclaw/agents/ops/agent",
+        "subagents": {
+          "allowAgents": [
+            "qa",
+            "pmo"
+          ]
+        }
+      }
+    ]
+  },
+  "tools": {
+    "profile": "coding",
+    "sessions": {
+      "visibility": "all"
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": "f35c189c9e3c6706248ab012c961f1e3cc3059f8a400429d"
+    },
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    }
+  }
+}
