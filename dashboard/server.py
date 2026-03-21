@@ -57,10 +57,13 @@ def _ensure_openclaw_runtime_config():
     """确保 openclaw 在本项目内有可用配置与身份文件。"""
     OC_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
-    if OC_CONFIG_PATH.exists():
-        return
+    # 优先清理可能存在的软链接（Fix: 避免 Too many levels of symbolic links）
+    if OC_CONFIG_PATH.exists() and OC_CONFIG_PATH.is_symlink():
+        log.info(f"Removing symlink config: {OC_CONFIG_PATH}")
+        OC_CONFIG_PATH.unlink()
 
     cfg = {}
+    # 查找可用的源配置（优先从 ~/.openclaw 读取）
     cfg_candidates = [
         OCLAW_HOME / 'openclaw.json',
         OCLAW_HOME / 'openclaw.json.bak',
@@ -74,6 +77,7 @@ def _ensure_openclaw_runtime_config():
             if c.exists() and not c.is_symlink():
                 cfg = read_json(c, {})
                 if isinstance(cfg, dict) and cfg:
+                    log.info(f"Using source config from: {c}")
                     break
         except Exception:
             continue
@@ -1624,11 +1628,27 @@ def _compute_phase_durations(flow_log):
     """从 flow_log 计算每个阶段的停留时长。"""
     if not flow_log or len(flow_log) < 1:
         return []
+    
+    # 阶段所有权映射 (与前端 store.ts 保持同步)
+    PHASE_MAP = {
+        'PMO': 'PMO',
+        '产品经理': '产品',
+        'UI设计师': 'UI',
+        '研发团队': '研发',
+        '研发': '研发',
+        '测试工程师': '测试',
+        '运维工程师': '运维',
+        '业务方': '业务方',
+    }
+
     phases = []
     for i, fl in enumerate(flow_log):
         start_at = fl.get('at', '')
         to_dept = fl.get('to', '')
         remark = fl.get('remark', '')
+        
+        phase_label = PHASE_MAP.get(to_dept, to_dept)
+        
         # 下一阶段的起始时间就是本阶段的结束时间
         if i + 1 < len(flow_log):
             end_at = flow_log[i + 1].get('at', '')
@@ -1636,6 +1656,7 @@ def _compute_phase_durations(flow_log):
         else:
             end_at = now_iso()
             ongoing = True
+        
         # 计算时长
         dur_sec = 0
         try:
@@ -1644,26 +1665,36 @@ def _compute_phase_durations(flow_log):
             dur_sec = max(0, int((to_dt - from_dt).total_seconds()))
         except Exception:
             pass
-        # 人类可读时长
-        if dur_sec < 60:
-            dur_text = f'{dur_sec}秒'
-        elif dur_sec < 3600:
-            dur_text = f'{dur_sec // 60}分{dur_sec % 60}秒'
-        elif dur_sec < 86400:
-            h, rem = divmod(dur_sec, 3600)
-            dur_text = f'{h}小时{rem // 60}分'
+            
+        # 合并相邻的同阶段记录（如多次重试或自动回滚产生的记录）
+        if phases and phases[-1]['phase'] == phase_label:
+            phases[-1]['durationSec'] += dur_sec
+            phases[-1]['ongoing'] = ongoing
+            phases[-1]['to'] = end_at
         else:
-            d, rem = divmod(dur_sec, 86400)
-            dur_text = f'{d}天{rem // 3600}小时'
-        phases.append({
-            'phase': to_dept,
-            'from': start_at,
-            'to': end_at,
-            'durationSec': dur_sec,
-            'durationText': dur_text,
-            'ongoing': ongoing,
-            'remark': remark,
-        })
+            phases.append({
+                'phase': phase_label,
+                'from': start_at,
+                'to': end_at,
+                'durationSec': dur_sec,
+                'ongoing': ongoing,
+                'remark': remark,
+            })
+
+    # 格式化人类可读时长
+    for p in phases:
+        ds = p['durationSec']
+        if ds < 60:
+            p['durationText'] = f'{ds}秒'
+        elif ds < 3600:
+            p['durationText'] = f'{ds // 60}分{ds % 60}秒'
+        elif ds < 86400:
+            h, rem = divmod(ds, 3600)
+            p['durationText'] = f'{h}小时{rem // 60}分'
+        else:
+            d, rem = divmod(ds, 86400)
+            p['durationText'] = f'{d}天{rem // 3600}小时'
+            
     return phases
 
 

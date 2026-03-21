@@ -1160,8 +1160,32 @@ function renderMonitor(tasks){
 
   let activeCount = 0;
   const cards = DEPTS.map(d => {
+    // 阶段所有权映射 (与前端 store.ts 保持同步)
+    const stateOwner = {
+      'Backlog': 'pmo',
+      'Planning': 'product',
+      'Designing': 'ui',
+      'Testing': 'qa',
+      'ReadyForRelease': 'ops',
+    };
+
     // 该岗位正在处理的任务
-    const myTasks = activeTasks.filter(t => t.org === d.label);
+    const myTasks = activeTasks.filter(t => {
+      // 1. 严格阶段所有权判定
+      const ownerId = stateOwner[t.state];
+      if (ownerId) return ownerId === d.id;
+
+      // 2. 开发阶段 (Developing) 或通用状态的判定
+      if (t.org === d.label) return true;
+      if (d.role.includes(t.org) || d.label.startsWith(t.org)) return true;
+      if (t.org === '研发' && (d.id === 'frontend' || d.id === 'backend')) {
+        if (t.progress_log && t.progress_log.some(p => ['frontend', 'backend'].includes(p.agent))) {
+          return t.progress_log.some(p => p.agent === d.id);
+        }
+        return true;
+      }
+      return (t.progress_log || []).some(p => p.agent === d.id);
+    });
     // 也从 flow_log 中找最近参与的任务
     const recentEdict = tasks.filter(t=>isEdict(t))
       .find(t=>(t.flow_log||[]).some(f=>f.from===d.label||f.to===d.label));

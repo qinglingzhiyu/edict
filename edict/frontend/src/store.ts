@@ -76,14 +76,45 @@ export function isActiveTask(t: Task): boolean {
 export function getDeptTasks(deptId: string, tasks: Task[]): Task[] {
   const d = DEPTS.find(x => x.id === deptId);
   if (!d) return [];
+
+  // 阶段所有权映射 (State -> DeptId)
+  // 当任务处于这些阶段时，应严格归属于特定部门，而不受历史日志影响
+  const stateOwner: Record<string, string> = {
+    'Backlog': 'pmo',
+    'Planning': 'product',
+    'Designing': 'ui',
+    'Testing': 'qa',
+    'ReadyForRelease': 'ops',
+  };
+
   return tasks.filter((t) => {
     if (!isEdict(t)) return false;
-    // 1. 直接匹配部门标签
+
+    // 1. 严格阶段所有权判定
+    const ownerId = stateOwner[t.state];
+    if (ownerId) {
+      return ownerId === d.id;
+    }
+
+    // 2. 研发阶段 (Developing) 或通用状态 (Doing/Next) 的判定逻辑
+    // 直接匹配部门标签 (如 "前端工程师" === "前端工程师")
     if (t.org === d.label) return true;
-    // 2. 简称/前缀匹配 (如 "研发" 匹配 前端/后端)
-    if (d.role.includes(t.org) || d.label.startsWith(t.org) || (t.org === '研发' && (d.id === 'frontend' || d.id === 'backend'))) return true;
-    // 3. 动态匹配：如果该 Agent 在 progress_log 中有记录
+    
+    // 简称/前缀匹配 (如 "前端" 匹配 "前端工程师")
+    if (d.role.includes(t.org) || d.label.startsWith(t.org)) return true;
+    
+    // 特殊处理 "研发" 标签：在开发阶段可同时出现在前后端，除非有更精确的 progress_log
+    if (t.org === '研发' && (d.id === 'frontend' || d.id === 'backend')) {
+      // 如果已经有明确的 agent 记录，则按记录匹配
+      if (t.progress_log?.some((p: any) => ['frontend', 'backend'].includes(p.agent))) {
+        return t.progress_log.some((p: any) => p.agent === d.id);
+      }
+      return true; // 否则默认出现在两者
+    }
+
+    // 历史日志匹配 (仅作为兜底)
     if (t.progress_log?.some((p: any) => p.agent === d.id)) return true;
+
     return false;
   });
 }
