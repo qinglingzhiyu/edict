@@ -4,13 +4,13 @@ import { api } from '../api';
 import type { SubConfig, MorningNewsItem } from '../api';
 
 const CAT_META: Record<string, { icon: string; color: string; desc: string }> = {
-  '政治': { icon: '🏛️', color: '#6a9eff', desc: '全球政治动态' },
-  '军事': { icon: '⚔️', color: '#ff5270', desc: '军事与冲突' },
-  '经济': { icon: '💹', color: '#2ecc8a', desc: '经济与市场' },
+  '前端': { icon: '💻', color: '#6a9eff', desc: '前端技术动态' },
+  '后端': { icon: '⚙️', color: '#ff5270', desc: '后端与架构进展' },
   'AI大模型': { icon: '🤖', color: '#a07aff', desc: 'AI与大模型进展' },
+  '开发工具': { icon: '🛠️', color: '#2ecc8a', desc: '开发者工具与效率' },
 };
 
-const DEFAULT_CATS = ['政治', '军事', '经济', 'AI大模型'];
+const DEFAULT_CATS = ['前端', '后端', 'AI大模型', '开发工具'];
 
 export default function MorningPanel() {
   const morningBrief = useStore((s) => s.morningBrief);
@@ -70,7 +70,7 @@ export default function MorningPanel() {
             setRefreshing(false);
             setRefreshLabel('⟳ 立即采集');
             loadMorning();
-            toast('✅ 天下要闻已更新', 'ok');
+            toast('✅ 技术晨报已更新', 'ok');
           } else {
             setRefreshLabel(`⟳ 采集中… (${count * 5}s)`);
           }
@@ -155,11 +155,11 @@ export default function MorningPanel() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🌅 天下要闻</div>
+          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🌅 每日技术晨报</div>
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>
             {dateStr && `${dateStr} | `}
             {morningBrief?.generated_at && `采集于 ${morningBrief.generated_at} | `}
-            共 {totalNews} 条要闻
+            共 {totalNews} 条技术动态
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>

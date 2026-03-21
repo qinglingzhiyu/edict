@@ -1,5 +1,5 @@
 #!/bin/bash
-# 三省六部 · 数据刷新循环
+# 技术部门 · 数据刷新循环
 # 用法: ./run_loop.sh [间隔秒数 [巡检间隔秒数]]
 #   间隔秒数：数据刷新频率，默认 15 秒
 #   巡检间隔秒数：自动重试卡住任务的频率，默认 120 秒
@@ -8,8 +8,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INTERVAL="${1:-15}"
-LOG="/tmp/sansheng_liubu_refresh.log"
-PIDFILE="/tmp/sansheng_liubu_refresh.pid"
+LOG="/tmp/tech_dept_refresh.log"
+PIDFILE="/tmp/tech_dept_refresh.pid"
 MAX_LOG_SIZE=$((10 * 1024 * 1024))  # 10MB
 
 # ── 单实例保护 ──
@@ -43,7 +43,7 @@ SCAN_INTERVAL="${2:-120}"  # 巡检间隔(秒), 默认 120
 SCAN_COUNTER=0
 SCRIPT_TIMEOUT=30  # 单个脚本最大执行时间(秒)
 
-echo "🏛️  三省六部数据刷新循环启动 (PID=$$)"
+echo "🏛️  技术部门数据刷新循环启动 (PID=$$)"
 echo "   脚本目录: $SCRIPT_DIR"
 echo "   间隔: ${INTERVAL}s"
 echo "   巡检间隔: ${SCAN_INTERVAL}s"

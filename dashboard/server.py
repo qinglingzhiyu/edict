@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-三省六部 · 看板本地 API 服务器
+技术部门 · 看板本地 API 服务器
 Port: 7891 (可通过 --port 修改)
 
 Endpoints:
@@ -105,11 +105,11 @@ def handle_task_action(task_id, action, reason):
 
     if action == 'stop':
         task['state'] = 'Blocked'
-        task['block'] = reason or '皇上叫停'
+        task['block'] = reason or '业务方叫停'
         task['now'] = f'⏸️ 已暂停：{reason}'
     elif action == 'cancel':
         task['state'] = 'Cancelled'
-        task['block'] = reason or '皇上取消'
+        task['block'] = reason or '业务方取消'
         task['now'] = f'🚫 已取消：{reason}'
     elif action == 'resume':
         # Resume to previous active state or Doing
@@ -122,7 +122,7 @@ def handle_task_action(task_id, action, reason):
 
     task.setdefault('flow_log', []).append({
         'at': now_iso(),
-        'from': '皇上',
+        'from': '业务方',
         'to': task.get('org', ''),
         'remark': f'{"⏸️ 叫停" if action == "stop" else "🚫 取消" if action == "cancel" else "▶️ 恢复"}：{reason}'
     })
@@ -130,7 +130,7 @@ def handle_task_action(task_id, action, reason):
     if action == 'resume':
         _scheduler_mark_progress(task, f'恢复到 {task.get("state", "Doing")}')
     else:
-        _scheduler_add_flow(task, f'皇上{action}：{reason or "无"}')
+        _scheduler_add_flow(task, f'业务方{action}：{reason or "无"}')
 
     task['updatedAt'] = now_iso()
 
@@ -152,7 +152,7 @@ def handle_archive_task(task_id, archived, archive_all_done=False):
                 t['archivedAt'] = now_iso()
                 count += 1
         save_tasks(tasks)
-        return {'ok': True, 'message': f'{count} 道旨意已归档', 'count': count}
+        return {'ok': True, 'message': f'{count} 个需求已归档', 'count': count}
     task = next((t for t in tasks if t.get('id') == task_id), None)
     if not task:
         return {'ok': False, 'error': f'任务 {task_id} 不存在'}
@@ -503,9 +503,9 @@ def push_to_feishu():
     payload = json.dumps({
         'msg_type': 'interactive',
         'card': {
-            'header': {'title': {'tag': 'plain_text', 'content': f'📰 天下要闻 · {date_fmt}'}, 'template': 'blue'},
+            'header': {'title': {'tag': 'plain_text', 'content': f'📰 技术晨报 · {date_fmt}'}, 'template': 'blue'},
             'elements': [
-                {'tag': 'div', 'text': {'tag': 'lark_md', 'content': f'共 **{total}** 条要闻已更新\n{summary}'}},
+                {'tag': 'div', 'text': {'tag': 'lark_md', 'content': f'共 **{total}** 条技术动态已更新\n{summary}'}},
                 {'tag': 'action', 'actions': [{'tag': 'button', 'text': {'tag': 'plain_text', 'content': '🔗 查看完整简报'}, 'url': 'http://127.0.0.1:7891', 'type': 'primary'}]},
                 {'tag': 'note', 'elements': [{'tag': 'plain_text', 'content': f"采集于 {brief.get('generated_at', '')}"}]}
             ]
@@ -528,42 +528,42 @@ _JUNK_TITLES = {
 }
 
 
-def handle_create_task(title, org='中书省', official='中书令', priority='normal', template_id='', params=None, target_dept=''):
-    """从看板创建新任务（圣旨模板下旨）。"""
+def handle_create_task(title, org='PMO', official='项目管理', priority='normal', template_id='', params=None, target_dept=''):
+    """从看板创建新任务（需求模板下发）。"""
     if not title or not title.strip():
         return {'ok': False, 'error': '任务标题不能为空'}
     title = title.strip()
     # 剥离 Conversation info 元数据
     title = re.split(r'\n*Conversation info\s*\(', title, maxsplit=1)[0].strip()
     title = re.split(r'\n*```', title, maxsplit=1)[0].strip()
-    # 清理常见前缀: "传旨:" "下旨:" 等
-    title = re.sub(r'^(传旨|下旨)[：:\uff1a]\s*', '', title)
+    # 清理常见前缀: "需求:" "下发需求:" 等
+    title = re.sub(r'^(需求|下发需求)[：:\uff1a]\s*', '', title)
     if len(title) > 100:
         title = title[:100] + '…'
-    # 标题质量校验：防止闲聊被误建为旨意
+    # 标题质量校验：防止闲聊被误建为需求
     if len(title) < _MIN_TITLE_LEN:
-        return {'ok': False, 'error': f'标题过短（{len(title)}<{_MIN_TITLE_LEN}字），不像是旨意'}
+        return {'ok': False, 'error': f'标题过短（{len(title)}<{_MIN_TITLE_LEN}字），不像是需求'}
     if title.lower() in _JUNK_TITLES:
-        return {'ok': False, 'error': f'「{title}」不是有效旨意，请输入具体工作指令'}
-    # 生成 task id: JJC-YYYYMMDD-NNN
+        return {'ok': False, 'error': f'「{title}」不是有效需求，请输入具体工作指令'}
+    # 生成 task id: PRJ-YYYYMMDD-NNN
     today = datetime.datetime.now().strftime('%Y%m%d')
     tasks = load_tasks()
-    today_ids = [t['id'] for t in tasks if t.get('id', '').startswith(f'JJC-{today}-')]
+    today_ids = [t['id'] for t in tasks if t.get('id', '').startswith(f'PRJ-{today}-')]
     seq = 1
     if today_ids:
         nums = [int(tid.split('-')[-1]) for tid in today_ids if tid.split('-')[-1].isdigit()]
         seq = max(nums) + 1 if nums else 1
-    task_id = f'JJC-{today}-{seq:03d}'
-    # 正确流程起点：皇上 -> 太子分拣
-    # target_dept 记录模板建议的最终执行部门（仅供尚书省派发参考）
-    initial_org = '太子'
+    task_id = f'PRJ-{today}-{seq:03d}'
+    # 正确流程起点：业务方 -> PMO分拣
+    # target_dept 记录模板建议的最终执行部门
+    initial_org = 'PMO'
     new_task = {
         'id': task_id,
         'title': title,
         'official': official,
         'org': initial_org,
-        'state': 'Taizi',
-        'now': '等待太子接旨分拣',
+        'state': 'Backlog',
+        'now': '等待PMO接收需求',
         'eta': '-',
         'block': '无',
         'output': '',
@@ -573,9 +573,9 @@ def handle_create_task(title, org='中书省', official='中书令', priority='n
         'templateParams': params or {},
         'flow_log': [{
             'at': now_iso(),
-            'from': '皇上',
+            'from': '业务方',
             'to': initial_org,
-            'remark': f'下旨：{title}'
+            'remark': f'下发需求：{title}'
         }],
         'updatedAt': now_iso(),
     }
@@ -584,67 +584,67 @@ def handle_create_task(title, org='中书省', official='中书令', priority='n
 
     _ensure_scheduler(new_task)
     _scheduler_snapshot(new_task, 'create-task-initial')
-    _scheduler_mark_progress(new_task, '任务创建')
+    _scheduler_mark_progress(new_task, '需求创建')
 
     tasks.insert(0, new_task)
     save_tasks(tasks)
-    log.info(f'创建任务: {task_id} | {title[:40]}')
+    log.info(f'创建需求: {task_id} | {title[:40]}')
 
-    dispatch_for_state(task_id, new_task, 'Taizi', trigger='imperial-edict')
+    dispatch_for_state(task_id, new_task, 'Backlog', trigger='business-requirement')
 
-    return {'ok': True, 'taskId': task_id, 'message': f'旨意 {task_id} 已下达，正在派发给太子'}
+    return {'ok': True, 'taskId': task_id, 'message': f'需求 {task_id} 已下发，正在派发给PMO'}
 
 
 def handle_review_action(task_id, action, comment=''):
-    """门下省御批：准奏/封驳。"""
+    """评审部评审：通过/驳回。"""
     tasks = load_tasks()
     task = next((t for t in tasks if t.get('id') == task_id), None)
     if not task:
         return {'ok': False, 'error': f'任务 {task_id} 不存在'}
-    if task.get('state') not in ('Review', 'Menxia'):
-        return {'ok': False, 'error': f'任务 {task_id} 当前状态为 {task.get("state")}，无法御批'}
+    if task.get('state') not in ('Testing', 'ReadyForRelease'):
+        return {'ok': False, 'error': f'任务 {task_id} 当前状态为 {task.get("state")}，无法评审'}
 
     _ensure_scheduler(task)
     _scheduler_snapshot(task, f'review-before-{action}')
 
     if action == 'approve':
-        if task['state'] == 'Menxia':
-            task['state'] = 'Assigned'
-            task['now'] = '门下省准奏，移交尚书省派发'
-            remark = f'✅ 准奏：{comment or "门下省审议通过"}'
-            to_dept = '尚书省'
-        else:  # Review
-            task['state'] = 'Done'
-            task['now'] = '御批通过，任务完成'
-            remark = f'✅ 御批准奏：{comment or "审查通过"}'
-            to_dept = '皇上'
+        if task['state'] == 'Testing':
+            task['state'] = 'ReadyForRelease'
+            task['now'] = '测试评审通过，移交运维准备发布'
+            remark = f'✅ 通过：{comment or "评审通过"}'
+            to_dept = '运维'
+        else:  # ReadyForRelease
+            task['state'] = 'Released'
+            task['now'] = '发布评审通过，任务完成'
+            remark = f'✅ 评审通过：{comment or "发布成功"}'
+            to_dept = '业务方'
     elif action == 'reject':
         round_num = (task.get('review_round') or 0) + 1
         task['review_round'] = round_num
-        task['state'] = 'Zhongshu'
-        task['now'] = f'封驳退回中书省修订（第{round_num}轮）'
-        remark = f'🚫 封驳：{comment or "需要修改"}'
-        to_dept = '中书省'
+        task['state'] = 'Developing'
+        task['now'] = f'驳回并退回研发修订（第{round_num}轮）'
+        remark = f'🚫 驳回：{comment or "需要修改"}'
+        to_dept = '研发'
     else:
         return {'ok': False, 'error': f'未知操作: {action}'}
 
     task.setdefault('flow_log', []).append({
         'at': now_iso(),
-        'from': '门下省' if task.get('state') != 'Done' else '皇上',
+        'from': '测试' if task.get('state') != 'Released' else '业务方',
         'to': to_dept,
         'remark': remark
     })
-    _scheduler_mark_progress(task, f'审议动作 {action} -> {task.get("state")}')
+    _scheduler_mark_progress(task, f'评审动作 {action} -> {task.get("state")}')
     task['updatedAt'] = now_iso()
     save_tasks(tasks)
 
     # 🚀 审批后自动派发对应 Agent
     new_state = task['state']
-    if new_state not in ('Done',):
+    if new_state not in ('Released',):
         dispatch_for_state(task_id, task, new_state)
 
-    label = '已准奏' if action == 'approve' else '已封驳'
-    dispatched = ' (已自动派发 Agent)' if new_state != 'Done' else ''
+    label = '已通过' if action == 'approve' else '已驳回'
+    dispatched = ' (已自动派发 Agent)' if new_state != 'Released' else ''
     return {'ok': True, 'message': f'{task_id} {label}{dispatched}'}
 
 
@@ -907,7 +907,7 @@ def _ensure_scheduler(task):
 def _scheduler_add_flow(task, remark, to=''):
     task.setdefault('flow_log', []).append({
         'at': now_iso(),
-        'from': '太子调度',
+        'from': '研发调度',
         'to': to or task.get('org', ''),
         'remark': f'🧭 {remark}'
     })
@@ -1002,8 +1002,8 @@ def handle_scheduler_escalate(task_id, reason=''):
     sched = _ensure_scheduler(task)
     current_level = int(sched.get('escalationLevel') or 0)
     next_level = min(current_level + 1, 2)
-    target = 'menxia' if next_level == 1 else 'shangshu'
-    target_label = '门下省' if next_level == 1 else '尚书省'
+    target = 'product' if next_level == 1 else 'pmo'
+    target_label = '产品经理' if next_level == 1 else 'PMO'
 
     sched['escalationLevel'] = next_level
     sched['lastEscalatedAt'] = now_iso()
@@ -1012,7 +1012,7 @@ def handle_scheduler_escalate(task_id, reason=''):
     save_tasks(tasks)
 
     msg = (
-        f'🧭 太子调度升级通知\n'
+        f'🧭 研发调度升级通知\n'
         f'任务ID: {task_id}\n'
         f'当前状态: {state}\n'
         f'停滞处理: 请你介入协调推进\n'
@@ -1101,8 +1101,8 @@ def handle_scheduler_scan(threshold_sec=600):
 
         if level < 2:
             next_level = level + 1
-            target = 'menxia' if next_level == 1 else 'shangshu'
-            target_label = '门下省' if next_level == 1 else '尚书省'
+            target = 'product' if next_level == 1 else 'pmo'
+            target_label = '产品经理' if next_level == 1 else 'PMO'
             sched['escalationLevel'] = next_level
             sched['lastEscalatedAt'] = now_iso()
             _scheduler_add_flow(task, f'停滞{stalled_sec}秒，升级至{target_label}协调', to=target_label)
@@ -1185,32 +1185,32 @@ def _startup_recover_queued_dispatches():
 
 
 def handle_repair_flow_order():
-    """修复历史任务中首条流转为“皇上->中书省”的错序问题。"""
+    """修复历史任务中首条流转为“业务方->PMO”的错序问题。"""
     tasks = load_tasks()
     fixed = 0
     fixed_ids = []
 
     for task in tasks:
         task_id = task.get('id', '')
-        if not task_id.startswith('JJC-'):
+        if not task_id.startswith('PRJ-') and not task_id.startswith('JJC-'):
             continue
         flow_log = task.get('flow_log') or []
         if not flow_log:
             continue
 
         first = flow_log[0]
-        if first.get('from') != '皇上' or first.get('to') != '中书省':
+        if first.get('from') != '业务方' or first.get('to') != 'PMO':
             continue
 
-        first['to'] = '太子'
+        first['to'] = 'PMO'
         remark = first.get('remark', '')
-        if isinstance(remark, str) and remark.startswith('下旨：'):
+        if isinstance(remark, str) and remark.startswith('下发需求：'):
             first['remark'] = remark
 
-        if task.get('state') == 'Zhongshu' and task.get('org') == '中书省' and len(flow_log) == 1:
-            task['state'] = 'Taizi'
-            task['org'] = '太子'
-            task['now'] = '等待太子接旨分拣'
+        if task.get('state') == 'Planning' and task.get('org') == '产品' and len(flow_log) == 1:
+            task['state'] = 'Backlog'
+            task['org'] = 'PMO'
+            task['now'] = '等待PMO接收需求'
 
         task['updatedAt'] = now_iso()
         fixed += 1
@@ -2543,7 +2543,7 @@ def main():
     ALLOWED_ORIGIN = args.cors
 
     server = HTTPServer((args.host, args.port), Handler)
-    log.info(f'三省六部看板启动 → http://{args.host}:{args.port}')
+    log.info(f'技术部门看板启动 → http://{args.host}:{args.port}')
     print(f'   按 Ctrl+C 停止')
 
     # 启动恢复：重新派发上次被 kill 中断的 queued 任务

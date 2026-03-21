@@ -72,7 +72,7 @@ function EdictCard({ task }: { task: Task }) {
 
   return (
     <div
-      className={`edict-card${archived ? ' archived' : ''}`}
+      className={`edict-card${archived ? 'archived' : ''}`}
       onClick={() => setModalTaskId(task.id)}
     >
       <MiniPipe task={task} />
@@ -108,7 +108,7 @@ function EdictCard({ task }: { task: Task }) {
               {i + 1}
             </span>
           ))}
-          <span style={{ color: 'var(--muted)', fontSize: 10 }}>第 {task.review_round} 轮磋商</span>
+          <span style={{ color: 'var(--muted)', fontSize: 10 }}>第 {task.review_round} 轮评审</span>
         </div>
       )}
       {todoTotal > 0 && (
@@ -211,7 +211,7 @@ export default function EdictBoard() {
         <span className="ab-count">
           活跃 {activeEdicts.length} · 归档 {archivedEdicts.length} · 共 {allEdicts.length}
         </span>
-        <button className="ab-scan" onClick={handleScan}>🧭 太子巡检</button>
+        <button className="ab-scan" onClick={handleScan}>🧭 研发巡检</button>
       </div>
 
       {/* Grid */}

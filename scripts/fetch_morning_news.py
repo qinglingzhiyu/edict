@@ -1,46 +1,46 @@
 #!/usr/bin/env python3
 """
-早朝简报采集脚本
+技术晨报采集脚本
 每日 06:00 自动运行，抓取全球新闻 RSS → data/morning_brief_YYYYMMDD.json
-覆盖: 政治 | 军事 | 经济 | AI大模型
+覆盖: 前端 | 后端 | AI大模型 | 开发工具
 """
 import json, pathlib, datetime, subprocess, re, sys, os, logging
 from xml.etree import ElementTree as ET
 from file_lock import atomic_json_write
 from utils import validate_url
 
-log = logging.getLogger('朝报')
+log = logging.getLogger('晨报')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(message)s', datefmt='%H:%M:%S')
 
 DATA = pathlib.Path(__file__).resolve().parent.parent / 'data'
 
 # ── RSS 源配置 ──────────────────────────────────────────────────────────
 FEEDS = {
-    '政治': [
-        ('BBC World', 'https://feeds.bbci.co.uk/news/world/rss.xml'),
-        ('Reuters World', 'https://feeds.reuters.com/reuters/worldNews'),
-        ('AP Top News', 'https://rsshub.app/apnews/topics/ap-top-news'),
+    '前端': [
+        ('InfoQ 前端', 'https://www.infoq.cn/topic/Front-end/rss'),
+        ('Juejin Frontend', 'https://rsshub.app/juejin/category/frontend'),
+        ('Smashing Magazine', 'https://www.smashingmagazine.com/feed/'),
     ],
-    '军事': [
-        ('Defense News', 'https://www.defensenews.com/rss/'),
-        ('BBC World', 'https://feeds.bbci.co.uk/news/world/rss.xml'),
-        ('Reuters', 'https://feeds.reuters.com/reuters/worldNews'),
+    '后端': [
+        ('InfoQ 后端', 'https://www.infoq.cn/topic/Back-end/rss'),
+        ('DZone Architecture', 'https://feeds.dzone.com/architecture'),
+        ('High Scalability', 'http://feeds.feedburner.com/HighScalability'),
     ],
-    '经济': [
-        ('Reuters Business', 'https://feeds.reuters.com/reuters/businessNews'),
-        ('BBC Business', 'https://feeds.bbci.co.uk/news/business/rss.xml'),
-        ('CNBC', 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114'),
+    '开发工具': [
+        ('GitHub Trending', 'https://rsshub.app/github/trending/daily/any'),
+        ('Hacker News', 'https://news.ycombinator.com/rss'),
+        ('Product Hunt', 'https://www.producthunt.com/feed'),
     ],
     'AI大模型': [
-        ('Hacker News', 'https://hnrss.org/newest?q=AI+LLM+model&points=50'),
+        ('Hacker News AI', 'https://hnrss.org/newest?q=AI+LLM+model&points=50'),
         ('VentureBeat AI', 'https://venturebeat.com/category/ai/feed/'),
-        ('MIT Tech Review', 'https://www.technologyreview.com/feed/'),
+        ('MIT Tech Review AI', 'https://www.technologyreview.com/topic/artificial-intelligence/feed/'),
     ],
 }
 
 CATEGORY_KEYWORDS = {
-    '军事': ['war', 'military', 'troops', 'attack', 'missile', 'army', 'navy', 'weapons',
-              '战', '军', '导弹', '士兵', 'ukraine', 'russia', 'china sea', 'nato'],
+    '前端': ['react', 'vue', 'typescript', 'web', 'javascript', 'css', 'node'],
+    '后端': ['java', 'python', 'go', 'rust', 'database', 'microservices', 'kubernetes', 'docker'],
     'AI大模型': ['ai', 'llm', 'gpt', 'claude', 'gemini', 'openai', 'anthropic', 'deepseek',
                 'machine learning', 'neural', 'model', '大模型', '人工智能', 'chatgpt'],
 }

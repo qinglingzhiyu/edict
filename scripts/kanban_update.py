@@ -10,14 +10,14 @@
 两种模式互相独立，数据不会自动同步。
 
 用法:
-  # 新建任务（收旨时）
-  python3 kanban_update.py create JJC-20260223-012 "任务标题" Zhongshu 中书省 中书令
+  # 新建任务（接收需求时）
+  python3 kanban_update.py create JJC-20260223-012 "需求标题" Planning 产品 产品经理
 
   # 更新状态
-  python3 kanban_update.py state JJC-20260223-012 Menxia "规划方案已提交门下省"
+  python3 kanban_update.py state JJC-20260223-012 Testing "开发完成，进入联调测试"
 
   # 添加流转记录
-  python3 kanban_update.py flow JJC-20260223-012 "中书省" "门下省" "规划方案提交审核"
+  python3 kanban_update.py flow JJC-20260223-012 "产品" "UI" "PRD已完成，进入UI设计"
 
   # 完成任务
   python3 kanban_update.py done JJC-20260223-012 "/path/to/output" "任务完成摘要"
@@ -84,7 +84,7 @@ def find_task(tasks, task_id):
     return next((t for t in tasks if t.get('id') == task_id), None)
 
 
-# 旨意标题最低要求
+# 需求标题最低要求
 _MIN_TITLE_LEN = 6
 _JUNK_TITLES = {
     '?', '？', '好', '好的', '是', '否', '不', '不是', '对', '了解', '收到',
@@ -103,8 +103,8 @@ def _sanitize_text(raw, max_len=80):
     t = re.sub(r'[/\\.~][A-Za-z0-9_\-./]+(?:\.(?:py|js|ts|json|md|sh|yaml|yml|txt|csv|html|css|log))?', '', t)
     # 4) 剥离 URL
     t = re.sub(r'https?://\S+', '', t)
-    # 5) 清理常见前缀: "传旨:" "下旨:" "下旨（xxx）:" 等
-    t = re.sub(r'^(传旨|下旨)([（(][^)）]*[)）])?[：:\uff1a]\s*', '', t)
+    # 清理常见前缀: "需求:" "下发需求:" "下发需求（xxx）:" 等
+    t = re.sub(r'^(需求|下发需求)([（(][^)）]*[)）])?[：:\uff1a]\s*', '', t)
     # 6) 剥离系统元数据关键词
     t = re.sub(r'(message_id|session_id|chat_id|open_id|user_id|tenant_key)\s*[:=]\s*\S+', '', t)
     # 7) 合并多余空白
@@ -154,12 +154,12 @@ def _infer_agent_id_from_runtime(task=None):
 
 
 def _is_valid_task_title(title):
-    """校验标题是否足够作为一个旨意任务。"""
+    """校验标题是否足够作为一个需求任务。"""
     t = (title or '').strip()
     if len(t) < _MIN_TITLE_LEN:
-        return False, f'标题过短（{len(t)}<{_MIN_TITLE_LEN}字），疑似非旨意'
+        return False, f'标题过短（{len(t)}<{_MIN_TITLE_LEN}字），疑似非需求'
     if t.lower() in _JUNK_TITLES:
-        return False, f'标题 "{t}" 不是有效旨意'
+        return False, f'标题 "{t}" 不是有效需求'
     # 纯标点或问号
     if re.fullmatch(r'[\s?？!！.。,，…·\-—~]+', t):
         return False, '标题只有标点符号'
@@ -173,17 +173,17 @@ def _is_valid_task_title(title):
 
 
 def cmd_create(task_id, title, state, org, official, remark=None):
-    """新建任务（收旨时立即调用）"""
+    """新建任务（接收需求时立即调用）"""
     # 清洗标题（剥离元数据）
     title = _sanitize_title(title)
-    # 旨意标题校验
+    # 需求标题校验
     valid, reason = _is_valid_task_title(title)
     if not valid:
         log.warning(f'⚠️ 拒绝创建 {task_id}：{reason}')
         print(f'[看板] 拒绝创建：{reason}', flush=True)
         return
     actual_org = STATE_ORG_MAP.get(state, org)
-    clean_remark = _sanitize_remark(remark) if remark else f"下旨：{title}"
+    clean_remark = _sanitize_remark(remark) if remark else f"下发需求：{title}"
     def modifier(tasks):
         existing = next((t for t in tasks if t.get('id') == task_id), None)
         if existing:
@@ -196,7 +196,7 @@ def cmd_create(task_id, title, state, org, official, remark=None):
         tasks.insert(0, {
             "id": task_id, "title": title, "official": official,
             "org": actual_org, "state": state,
-            "now": clean_remark[:60] if remark else f"已下旨，等待{actual_org}接旨",
+            "now": clean_remark[:60] if remark else f"需求已下发，等待{actual_org}接收",
             "eta": "-", "block": "无", "output": "", "ac": "",
             "flow_log": [{"at": now_iso(), "from": "业务方", "to": actual_org, "remark": clean_remark}],
             "updatedAt": now_iso()

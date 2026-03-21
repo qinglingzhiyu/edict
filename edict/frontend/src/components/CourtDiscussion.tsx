@@ -1,12 +1,11 @@
 /**
- * 朝堂议政 — 多官员实时讨论可视化组件
+ * 部门站会 — 多角色实时讨论可视化组件
  *
- * 灵感来自 nvwa 项目的故事剧场 + 协作工坊 + 虚拟生活
  * 功能：
- *   - 可视化朝堂布局，官员站位
- *   - 实时群聊讨论，官员各抒己见
- *   - 皇帝（用户）随时发言参与
- *   - 天命降临（上帝视角）改变讨论走向
+ *   - 可视化办公区布局，成员位次
+ *   - 实时讨论，各角色各抒己见
+ *   - 业务方（用户）随时发言参与
+ *   - 突发事件（上帝视角）改变讨论走向
  *   - 命运骰子：随机事件增加趣味性
  *   - 自动推进 / 手动推进
  */
@@ -18,9 +17,8 @@ import { api } from '../api';
 // ── 常量 ──
 
 const OFFICIAL_COLORS: Record<string, string> = {
-  taizi: '#e8a040', zhongshu: '#a07aff', menxia: '#6a9eff', shangshu: '#2ecc8a',
-  libu: '#f5c842', hubu: '#ff9a6a', bingbu: '#ff5270', xingbu: '#cc4444',
-  gongbu: '#44aaff', libu_hr: '#9b59b6',
+  pmo: '#e8a040', product: '#a07aff', ui: '#6a9eff', frontend: '#2ecc8a',
+  backend: '#f5c842', qa: '#ff9a6a', ops: '#ff5270',
 };
 
 const EMOTION_EMOJI: Record<string, string> = {
@@ -29,13 +27,13 @@ const EMOTION_EMOJI: Record<string, string> = {
 };
 
 const COURT_POSITIONS: Record<string, { x: number; y: number }> = {
-  // 左列
-  zhongshu: { x: 15, y: 25 }, menxia: { x: 15, y: 45 }, shangshu: { x: 15, y: 65 },
-  // 右列
-  libu: { x: 85, y: 20 }, hubu: { x: 85, y: 35 }, bingbu: { x: 85, y: 50 },
-  xingbu: { x: 85, y: 65 }, gongbu: { x: 85, y: 80 },
-  // 中间
-  taizi: { x: 50, y: 20 }, libu_hr: { x: 50, y: 80 },
+  pmo: { x: 50, y: 20 },
+  product: { x: 20, y: 35 },
+  ui: { x: 20, y: 55 },
+  frontend: { x: 20, y: 75 },
+  backend: { x: 80, y: 35 },
+  qa: { x: 80, y: 55 },
+  ops: { x: 80, y: 75 },
 };
 
 interface CourtMessage {
@@ -319,18 +317,18 @@ export default function CourtDiscussion() {
       <div className="space-y-6">
         {/* Header */}
         <div className="text-center py-4">
-          <h2 className="text-xl font-bold bg-gradient-to-r from-amber-400 to-purple-400 bg-clip-text text-transparent">
-            🏛 朝堂议政
+          <h2 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            🏛 部门站会
           </h2>
           <p className="text-xs text-[var(--muted)] mt-1">
-            择臣上殿，围绕议题展开讨论 · 陛下可随时发言或降下天意改变走向
+            选择成员加入会议，围绕议题展开讨论 · 业务方可随时发言或注入突发事件
           </p>
         </div>
 
-        {/* 选择官员 */}
+        {/* 选择成员 */}
         <div className="bg-[var(--panel)] rounded-xl p-4 border border-[var(--line)]">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm font-semibold">👔 选择参朝官员</span>
+            <span className="text-sm font-semibold">👔 选择参会成员</span>
             <span className="text-xs text-[var(--muted)]">（{selectedIds.size}/8，至少2位）</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
@@ -446,7 +444,7 @@ export default function CourtDiscussion() {
       {/* 顶部控制栏 */}
       <div className="flex items-center justify-between flex-wrap gap-2 bg-[var(--panel)] rounded-xl px-4 py-2 border border-[var(--line)]">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-bold">🏛 朝堂议政</span>
+          <span className="text-sm font-bold">🏛 部门站会</span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--acc)]20 text-[var(--acc)] border border-[var(--acc)]30">
             第{session?.round || 0}轮
           </span>
@@ -459,10 +457,10 @@ export default function CourtDiscussion() {
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowDecree(!showDecree)}
-            className="text-xs px-2.5 py-1 rounded-lg border border-amber-600/40 text-amber-400 hover:bg-amber-900/20 transition"
-            title="天命降临 — 上帝视角干预"
+            className="text-xs px-2.5 py-1 rounded-lg border border-blue-600/40 text-blue-400 hover:bg-blue-900/20 transition"
+            title="注入事件 — 上帝视角干预"
           >
-            ⚡ 天命
+            ⚡ 突发
           </button>
           <button
             onClick={handleDice}
@@ -486,7 +484,7 @@ export default function CourtDiscussion() {
               onClick={handleConclude}
               className="text-xs px-2.5 py-1 rounded-lg border border-[var(--line)] text-[var(--muted)] hover:text-[var(--warn)] hover:border-[var(--warn)]40 transition"
             >
-              📋 散朝
+              📋 散会
             </button>
           )}
           <button
@@ -498,35 +496,35 @@ export default function CourtDiscussion() {
         </div>
       </div>
 
-      {/* 天命降临面板 */}
+      {/* 突发事件面板 */}
       {showDecree && (
         <div
-          className="bg-gradient-to-br from-amber-950/40 to-purple-950/30 rounded-xl p-4 border border-amber-700/30"
+          className="bg-gradient-to-br from-blue-950/40 to-purple-950/30 rounded-xl p-4 border border-blue-700/30"
           style={{ animation: 'fadeIn .3s' }}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-bold text-amber-400">⚡ 天命降临 — 上帝视角</span>
+            <span className="text-sm font-bold text-blue-400">⚡ 注入突发事件 — 上帝视角</span>
             <button onClick={() => setShowDecree(false)} className="text-xs text-[var(--muted)]">
               ✕
             </button>
           </div>
-          <p className="text-[10px] text-amber-300/60 mb-2">
-            降下天意改变讨论走向，所有官员将对此做出反应
+          <p className="text-[10px] text-blue-300/60 mb-2">
+            注入突发事件改变讨论走向，所有成员将对此做出反应
           </p>
           <div className="flex gap-2">
             <input
               value={decreeInput}
               onChange={(e) => setDecreeInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleDecree()}
-              placeholder="例如：突然发现预算多出一倍..."
-              className="flex-1 bg-black/30 rounded-lg px-3 py-1.5 text-sm border border-amber-800/40 outline-none focus:border-amber-600"
+              placeholder="例如：发现核心接口响应超时..."
+              className="flex-1 bg-black/30 rounded-lg px-3 py-1.5 text-sm border border-blue-800/40 outline-none focus:border-blue-600"
             />
             <button
               onClick={handleDecree}
               disabled={!decreeInput.trim()}
-              className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-600 to-purple-600 text-white text-xs font-semibold disabled:opacity-40"
+              className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-semibold disabled:opacity-40"
             >
-              降旨
+              注入
             </button>
           </div>
         </div>
@@ -561,21 +559,21 @@ export default function CourtDiscussion() {
 
       {/* 主内容：朝堂布局 + 聊天记录 */}
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-3">
-        {/* 左侧：朝堂可视化 */}
+        {/* 左侧：办公区可视化 */}
         <div className="bg-[var(--panel)] rounded-xl p-3 border border-[var(--line)] relative overflow-hidden min-h-[320px]">
-          {/* 龙椅 */}
+          {/* 主持位 */}
           <div className="text-center mb-2">
-            <div className="inline-block px-3 py-1 rounded-lg bg-gradient-to-b from-amber-800/40 to-amber-950/40 border border-amber-700/30">
-              <span className="text-lg">👑</span>
-              <div className="text-[10px] text-amber-400/80">龙 椅</div>
+            <div className="inline-block px-3 py-1 rounded-lg bg-gradient-to-b from-blue-800/40 to-blue-950/40 border border-blue-700/30">
+              <span className="text-lg">🏢</span>
+              <div className="text-[10px] text-blue-400/80">主 持 位</div>
             </div>
           </div>
 
-          {/* 官员站位 */}
+          {/* 成员站位 */}
           <div className="relative" style={{ minHeight: 250 }}>
-            {/* 左列标签 */}
-            <div className="absolute left-0 top-0 text-[9px] text-[var(--muted)] opacity-50">三省</div>
-            <div className="absolute right-0 top-0 text-[9px] text-[var(--muted)] opacity-50">六部</div>
+            {/* 布局标签 */}
+            <div className="absolute left-0 top-0 text-[9px] text-[var(--muted)] opacity-50">规划部</div>
+            <div className="absolute right-0 top-0 text-[9px] text-[var(--muted)] opacity-50">研发部</div>
 
             {officials.map((o) => {
               const pos = COURT_POSITIONS[o.id] || { x: 50, y: 50 };
@@ -652,26 +650,26 @@ export default function CourtDiscussion() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* 皇帝输入栏 */}
+          {/* 业务方输入栏 */}
           {session?.phase !== 'concluded' && (
             <div className="border-t border-[var(--line)] p-2 flex gap-2">
               <input
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleEmperor()}
-                placeholder="朕有话说..."
-                className="flex-1 bg-[var(--panel2)] rounded-lg px-3 py-1.5 text-sm border border-[var(--line)] outline-none focus:border-amber-600"
+                placeholder="我有话说..."
+                className="flex-1 bg-[var(--panel2)] rounded-lg px-3 py-1.5 text-sm border border-[var(--line)] outline-none focus:border-blue-600"
               />
               <button
                 onClick={handleEmperor}
                 disabled={!userInput.trim() || loading}
                 className="px-4 py-1.5 rounded-lg text-xs font-semibold border-0 disabled:opacity-40"
                 style={{
-                  background: userInput.trim() ? 'linear-gradient(135deg, #e8a040, #f5c842)' : 'var(--panel2)',
-                  color: userInput.trim() ? '#000' : 'var(--muted)',
+                  background: userInput.trim() ? 'linear-gradient(135deg, #6a9eff, #a07aff)' : 'var(--panel2)',
+                  color: userInput.trim() ? '#fff' : 'var(--muted)',
                 }}
               >
-                👑 发言
+                👤 发言
               </button>
               <button
                 onClick={() => handleAdvance()}
@@ -719,8 +717,8 @@ function MessageBubble({
   if (msg.type === 'emperor') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] bg-gradient-to-br from-amber-900/40 to-amber-800/20 rounded-xl px-3 py-2 border border-amber-700/30">
-          <div className="text-[10px] text-amber-400 mb-0.5">👑 皇帝</div>
+        <div className="max-w-[80%] bg-gradient-to-br from-blue-900/40 to-blue-800/20 rounded-xl px-3 py-2 border border-blue-700/30">
+          <div className="text-[10px] text-blue-400 mb-0.5">👤 业务方</div>
           <div className="text-sm">{msg.content}</div>
         </div>
       </div>
@@ -730,8 +728,8 @@ function MessageBubble({
   if (msg.type === 'decree') {
     return (
       <div className="text-center py-2">
-        <div className="inline-block bg-gradient-to-r from-amber-900/30 via-purple-900/30 to-amber-900/30 rounded-lg px-4 py-2 border border-amber-600/30">
-          <div className="text-xs text-amber-400 font-bold">⚡ 天命降临</div>
+        <div className="inline-block bg-gradient-to-r from-blue-900/30 via-purple-900/30 to-blue-900/30 rounded-lg px-4 py-2 border border-blue-600/30">
+          <div className="text-xs text-blue-400 font-bold">⚡ 突发事件</div>
           <div className="text-sm mt-0.5">{msg.content}</div>
         </div>
       </div>

@@ -39,8 +39,8 @@ export default function CourtCeremony() {
   return (
     <div className={`ceremony-bg${out ? ' out' : ''}`} onClick={skip}>
       <div className="crm-glow" />
-      <div className="crm-line1 in">🏛 早朝开始</div>
-      <div className="crm-line2 in">有事启奏，无事退朝</div>
+      <div className="crm-line1 in">🏛 每日站会</div>
+      <div className="crm-line2 in">同步进展，高效协作</div>
       <div className="crm-line3 in">
         待办 {pending} 件 · 已完成 {done} 件{overdue > 0 && ` · ⚠ 超期 ${overdue} 件`}
       </div>

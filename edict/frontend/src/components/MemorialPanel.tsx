@@ -14,7 +14,7 @@ export default function MemorialPanel() {
 
   const exportMemorial = (t: Task) => {
     const fl = t.flow_log || [];
-    let md = `# 📜 归档需求 · ${t.title}\n\n`;
+    let md = `# 📜 项目归档 · ${t.title}\n\n`;
     md += `- **任务编号**: ${t.id}\n`;
     md += `- **状态**: ${t.state}\n`;
     md += `- **负责部门**: ${t.org}\n`;
@@ -123,9 +123,9 @@ function MemorialDetailModal({
   const resultLog: FlowEntry[] = [];
   for (const f of fl) {
     if (f.from === '业务方') originLog.push(f);
-    else if (f.to === '中书省' || f.from === '中书省') planLog.push(f);
-    else if (f.to === '门下省' || f.from === '门下省') reviewLog.push(f);
-    else if (f.remark && (f.remark.includes('完成') || f.remark.includes('回奏'))) resultLog.push(f);
+    else if (f.to === 'pmo' || f.from === 'pmo') planLog.push(f);
+    else if (f.to === 'product' || f.from === 'product') reviewLog.push(f);
+    else if (f.remark && (f.remark.includes('完成') || f.remark.includes('反馈'))) resultLog.push(f);
     else execLog.push(f);
   }
 
@@ -178,11 +178,11 @@ function MemorialDetailModal({
             </div>
           )}
 
-          {renderPhase('圣旨原文', '👑', originLog)}
-          {renderPhase('中书规划', '📋', planLog)}
-          {renderPhase('门下审议', '🔍', reviewLog)}
-          {renderPhase('六部执行', '⚔️', execLog)}
-          {renderPhase('汇总回奏', '📨', resultLog)}
+          {renderPhase('需求描述', '👤', originLog)}
+          {renderPhase('PMO 规划', '📋', planLog)}
+          {renderPhase('产品评审', '🔍', reviewLog)}
+          {renderPhase('研发执行', '💻', execLog)}
+          {renderPhase('结果反馈', '📨', resultLog)}
 
           {t.output && t.output !== '-' && (
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>

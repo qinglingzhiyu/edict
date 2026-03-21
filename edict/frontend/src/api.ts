@@ -96,7 +96,7 @@ export const api = {
   createTask: (data: CreateTaskPayload) =>
     postJ<ActionResult & { taskId?: string }>(`${API_BASE}/api/create-task`, data),
 
-  // ── 朝堂议政 ──
+  // ── 部门站会 ──
   courtDiscussStart: (topic: string, officials: string[], taskId?: string) =>
     postJ<CourtDiscussResult>(`${API_BASE}/api/court-discuss/start`, { topic, officials, taskId }),
   courtDiscussAdvance: (sessionId: string, userMessage?: string, decree?: string) =>
@@ -412,7 +412,7 @@ export interface RemoteSkillsListResult {
   error?: string;
 }
 
-// ── 朝堂议政 ──
+// ── 部门站会 ──
 
 export interface CourtDiscussResult {
   ok: boolean;

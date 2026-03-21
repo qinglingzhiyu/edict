@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>军机处 · 三省六部总控台</title>
+  <title>技术部 · 研发协作总控台</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@700;900&display=swap');
     :root{
@@ -645,7 +645,7 @@
 <!-- COURT CEREMONY -->
 <div class="ceremony-bg" id="ceremony" style="display:none" onclick="skipCeremony()">
   <div class="crm-glow"></div>
-  <div class="crm-line1" id="crm-l1">早朝开始</div>
+  <div class="crm-line1" id="crm-l1">同步开始</div>
   <div class="crm-line2" id="crm-l2">各部听旨</div>
   <div class="crm-line3" id="crm-l3"></div>
   <div class="crm-date" id="crm-date"></div>
@@ -657,8 +657,8 @@
   <!-- HEADER -->
   <div class="hdr">
     <div>
-      <div class="logo">⚔️ 军机处 · 三省六部总控台</div>
-      <div class="sub">皇上视角 · 实时旨意追踪</div>
+      <div class="logo">🚀 技术部 · 研发协作总控台</div>
+      <div class="sub">业务方视角 · 实时需求追踪</div>
     </div>
     <div class="hdr-r">
       <span class="chip" id="chip-sync">⟳ 同步中</span>
@@ -676,7 +676,7 @@
     <div class="tab" data-tab="models">⚙️ 模型配置</div>
     <div class="tab" data-tab="skills">🛠️ 技能配置</div>
     <div class="tab" data-tab="sessions">💬 小任务 <span class="tbadge" id="tb-s">0</span></div>
-    <div class="tab" data-tab="memorials">📜 奏折阁 <span class="tbadge" id="tb-mem">0</span></div>
+    <div class="tab" data-tab="memorials">📦 项目归档 <span class="tbadge" id="tb-mem">0</span></div>
     <div class="tab" data-tab="templates">📜 旨库</div>
     <div class="tab" data-tab="morning">📰 天下要闻</div>
   </div>
@@ -689,7 +689,7 @@
       <button class="ab-btn" data-filter="archived" onclick="setEdictFilter('archived')">📦 已归档</button>
       <button class="ab-btn" data-filter="all" onclick="setEdictFilter('all')">全部</button>
       <span class="ab-count" id="archive-count"></span>
-      <button class="ab-scan" id="btn-global-scan" onclick="runGlobalSchedulerScan()">🧭 太子巡检</button>
+      <button class="ab-scan" id="btn-global-scan" onclick="runGlobalSchedulerScan()">🧭 研发巡检</button>
       <span class="ab-scan-status" id="global-scan-status">未巡检</span>
       <button class="ab-scan-detail" id="btn-global-scan-detail" onclick="toggleGlobalScanDetails()" style="display:none">查看巡检详情</button>
       <button class="ab-scan-copy" id="btn-global-scan-copy" onclick="copyGlobalScanReport()" style="display:none">📋 复制巡检报告</button>
@@ -754,8 +754,8 @@
   <div class="panel" id="panel-memorials">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div style="flex:1">
-        <div class="sec-title" style="margin-bottom:2px">📜 奏折阁 · 旨意存档</div>
-        <div style="font-size:11px;color:var(--muted)">任务完成后自动生成奏折，记录从下旨到完成的完整过程</div>
+        <div class="sec-title" style="margin-bottom:2px">📦 项目归档 · 需求存档</div>
+        <div style="font-size:11px;color:var(--muted)">任务完成后自动归档，记录从下发到完成的完整过程</div>
       </div>
       <select id="mem-filter" onchange="renderMemorials()" style="font-size:11px;padding:4px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--text);outline:none">
         <option value="all">全部</option>
@@ -771,7 +771,7 @@
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div style="flex:1">
         <div class="sec-title" style="margin-bottom:2px">📜 旨库 · 圣旨模板</div>
-        <div style="font-size:11px;color:var(--muted)">选择模板、填写参数、一键下旨 — 降低使用门槛，快速启动任务</div>
+        <div style="font-size:11px;color:var(--muted)">选择模板、填写参数、一键下发 — 降低使用门槛，快速启动任务</div>
       </div>
     </div>
     <div class="tpl-cats" id="tpl-cats"></div>
