@@ -59,6 +59,8 @@ export const api = {
     postJ<ActionResult>(`${API_BASE}/api/review-action`, { taskId, action, comment }),
   advanceState: (taskId: string, comment: string) =>
     postJ<ActionResult>(`${API_BASE}/api/advance-state`, { taskId, comment }),
+  deleteTask: (taskId: string) =>
+    postJ<ActionResult>(`${API_BASE}/api/delete-task`, { taskId }),
   archiveTask: (taskId: string, archived: boolean) =>
     postJ<ActionResult>(`${API_BASE}/api/archive-task`, { taskId, archived }),
   archiveAllDone: () =>

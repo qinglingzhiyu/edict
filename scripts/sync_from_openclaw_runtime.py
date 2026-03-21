@@ -262,6 +262,18 @@ def main():
                 deduped.append(t)
         tasks = deduped
 
+        # ── 过滤掉已手动删除的任务 ──
+        deleted_tasks_file = DATA / 'deleted_tasks.json'
+        deleted_ids = set()
+        if deleted_tasks_file.exists():
+            try:
+                deleted_ids = set(json.loads(deleted_tasks_file.read_text()))
+            except:
+                pass
+        
+        if deleted_ids:
+            tasks = [t for t in tasks if t['id'] not in deleted_ids]
+
         # ── 过滤掉非 JJC 且非活跃的系统会话，防止看板噪音 ──
         # 规则: 仅保留 24小时内更新的活跃会话，且排除 cron/subagent 等纯后台任务
         filtered_tasks = []
@@ -297,20 +309,21 @@ def main():
         
         tasks = filtered_tasks
         
-        # ── 保留已有的 JJC-* 旨意任务（不覆盖皇上下旨记录）──
-        # JJC 任务的 now 字段由 Agent 自己通过 kanban_update.py progress 命令主动上报，
+        # ── 保留已有的 PRJ-* / JJC-* 旨意任务（不覆盖皇上下旨记录）──
+        # PRJ/JJC 任务的 now 字段由 Agent 自己通过 kanban_update.py progress 命令主动上报，
         # 不再从会话日志中被动抓取。这里只做合并，不做 activity 映射。
         existing_tasks_file = DATA / 'tasks_source.json'
         if existing_tasks_file.exists():
             try:
                 existing = json.loads(existing_tasks_file.read_text())
-                jjc_existing = [t for t in existing if str(t.get('id', '')).startswith('JJC')]
+                # 同时保留 PRJ- (技术部) 和 JJC- (旧版兼容) 前缀的任务
+                preserved_existing = [t for t in existing if str(t.get('id', '')).startswith(('PRJ', 'JJC'))]
                 
-                # 去掉 tasks 里已有的 JJC（以防重复），再把旨意放到最前面
-                tasks = [t for t in tasks if not str(t.get('id', '')).startswith('JJC')]
-                tasks = jjc_existing + tasks
+                # 去掉 tasks 里已有的重复项，再把保留的任务放到最前面
+                tasks = [t for t in tasks if not str(t.get('id', '')).startswith(('PRJ', 'JJC'))]
+                tasks = preserved_existing + tasks
             except Exception as e:
-                log.error(f'merge existing JJC tasks failed: {e}')
+                log.error(f'merge existing tasks failed: {e}')
                 pass
 
         atomic_json_write(DATA / 'tasks_source.json', tasks)

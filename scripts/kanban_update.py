@@ -308,6 +308,20 @@ def cmd_block(task_id, reason):
     log.warning(f'⚠️ {task_id} 已阻塞: {reason}')
 
 
+def cmd_delete(task_id):
+    """永久删除任务（原子操作）"""
+    def modifier(tasks):
+        original_len = len(tasks)
+        tasks = [t for t in tasks if t.get('id') != task_id]
+        if len(tasks) == original_len:
+            log.error(f'任务 {task_id} 不存在，无法删除')
+        else:
+            log.info(f'✅ 任务 {task_id} 已从看板删除')
+        return tasks
+    atomic_json_update(TASKS_FILE, modifier, [])
+    _trigger_refresh()
+
+
 def cmd_progress(task_id, now_text, todos_pipe='', tokens=0, cost=0.0, elapsed=0):
     """🔥 实时进展汇报 — Agent 主动调用，不改变状态，只更新 now + todos
 
@@ -437,7 +451,7 @@ def cmd_todo(task_id, todo_id, title, status='not-started', detail=''):
     log.info(f'✅ {task_id} todo [{result_info[0]}/{result_info[1]}]: {todo_id} → {status}')
 
 _CMD_MIN_ARGS = {
-    'create': 6, 'state': 3, 'flow': 5, 'done': 2, 'block': 3, 'todo': 4, 'progress': 3,
+    'create': 6, 'state': 3, 'flow': 5, 'done': 2, 'block': 3, 'todo': 4, 'progress': 3, 'delete': 2,
 }
 
 if __name__ == '__main__':
@@ -460,6 +474,8 @@ if __name__ == '__main__':
         cmd_done(args[1], args[2] if len(args)>2 else '', args[3] if len(args)>3 else '')
     elif cmd == 'block':
         cmd_block(args[1], args[2])
+    elif cmd == 'delete':
+        cmd_delete(args[1])
     elif cmd == 'todo':
         # 解析可选 --detail 参数
         todo_pos = []

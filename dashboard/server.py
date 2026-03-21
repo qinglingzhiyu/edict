@@ -167,6 +167,31 @@ def handle_archive_task(task_id, archived, archive_all_done=False):
     return {'ok': True, 'message': f'{task_id} {label}'}
 
 
+def handle_delete_task(task_id):
+    """从看板永久删除一个任务。"""
+    # 1. 从 tasks_source.json 删除 (对于 PRJ/JJC 任务有效)
+    tasks = load_tasks()
+    original_len = len(tasks)
+    tasks = [t for t in tasks if t.get('id') != task_id]
+    
+    # 2. 如果是 OC- 任务，记录到已删除列表，防止同步脚本重新拉取
+    if task_id.startswith('OC-'):
+        deleted_list_path = DATA / 'deleted_tasks.json'
+        def add_to_deleted(current):
+            if not isinstance(current, list): current = []
+            if task_id not in current:
+                current.append(task_id)
+            return current
+        atomic_json_update(deleted_list_path, add_to_deleted, [])
+    
+    # 如果任务在 tasks_source 中确实存在并删除了，或者它是 OC 任务，都返回成功
+    if len(tasks) < original_len or task_id.startswith('OC-'):
+        save_tasks(tasks)
+        return {'ok': True, 'message': f'任务 {task_id} 已删除'}
+    
+    return {'ok': False, 'error': f'任务 {task_id} 不存在'}
+
+
 def update_task_todos(task_id, todos):
     """Update the todos list for a task."""
     tasks = load_tasks()
@@ -1957,11 +1982,16 @@ def dispatch_for_state(task_id, task, new_state, trigger='state-transition'):
                     'lastDispatchTrigger': trigger,
                 }))
                 return
-            # Fix #139: dispatch channel 可配置（默认 feishu，支持 telegram/wecom/signal 等）
+            # Fix #139: dispatch channel 可配置（默认 feishu，支持 direct/tui/telegram/wecom/signal 等）
             _agent_cfg = read_json(DATA / 'agent_config.json', {})
             _channel = (_agent_cfg.get('dispatchChannel') or 'feishu').strip()
-            cmd = ['openclaw', 'agent', '--agent', agent_id, '-m', msg,
-                   '--deliver', '--channel', _channel, '--timeout', '300']
+            
+            # 构造命令：如果是 direct，则不带 --deliver，直接阻塞执行（在后台线程中）
+            if _channel == 'direct':
+                cmd = ['openclaw', 'agent', '--agent', agent_id, '-m', msg, '--timeout', '300']
+            else:
+                cmd = ['openclaw', 'agent', '--agent', agent_id, '-m', msg,
+                       '--deliver', '--channel', _channel, '--timeout', '300']
             max_retries = 2
             err = ''
             for attempt in range(1, max_retries + 1):
@@ -2378,6 +2408,15 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({'ok': False, 'error': 'taskId or archiveAllDone required'}, 400)
                 return
             result = handle_archive_task(task_id, archived, archive_all)
+            self.send_json(result)
+            return
+
+        if p == '/api/delete-task':
+            task_id = body.get('taskId', '').strip()
+            if not task_id:
+                self.send_json({'ok': False, 'error': 'taskId required'}, 400)
+                return
+            result = handle_delete_task(task_id)
             self.send_json(result)
             return
 

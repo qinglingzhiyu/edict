@@ -1,4 +1,5 @@
 import { useStore, isEdict, STATE_LABEL, timeAgo } from '../store';
+import { api } from '../api';
 import type { Task } from '../api';
 import { useState } from 'react';
 
@@ -182,13 +183,52 @@ function SessionDetailModal({
   const inputTokens = (sm as Record<string, unknown>).inputTokens as number | undefined;
   const outputTokens = (sm as Record<string, unknown>).outputTokens as number | undefined;
 
+  const loadAll = useStore((s) => s.loadAll);
+  const toast = useStore((s) => s.toast);
+
+  const handleDelete = async () => {
+    if (!confirm(`确定要永久删除此任务/会话吗？\n${t.id}`)) return;
+    try {
+      const r = await api.deleteTask(t.id);
+      if (r.ok) {
+        toast(`🗑️ 已删除 ${t.id}`, 'ok');
+        loadAll();
+        onClose();
+      } else {
+        toast(r.error || '删除失败', 'err');
+      }
+    } catch {
+      toast('服务器连接失败', 'err');
+    }
+  };
+
   return (
     <div className="modal-bg open" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose}>✕</button>
         <div className="modal-body">
           <div style={{ fontSize: 11, color: 'var(--acc)', fontWeight: 700, letterSpacing: '.04em', marginBottom: 4 }}>{t.id}</div>
-          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>{emoji} {title}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ fontSize: 20, fontWeight: 800 }}>{emoji} {title}</div>
+            <button 
+              onClick={handleDelete}
+              style={{ 
+                background: 'rgba(255, 82, 112, 0.1)', 
+                color: '#ff5270', 
+                border: '1px solid rgba(255, 82, 112, 0.2)',
+                fontSize: 11,
+                padding: '4px 10px',
+                borderRadius: 6,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                marginRight: 24 // 避开右上角的关闭按钮
+              }}
+            >
+              <span>🗑️</span> 删除
+            </button>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
             <span className={`tag st-${st}`}>{STATE_LABEL[st] || st}</span>
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>{ch.icon} {ch.text}</span>

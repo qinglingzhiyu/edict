@@ -217,6 +217,22 @@ export default function TaskModal() {
     doTaskAction('cancel', reason);
   };
 
+  const handleDelete = async () => {
+    if (!confirm(`⚠️ 确定要永久删除任务 ${task.id} 吗？\n此操作不可恢复！`)) return;
+    try {
+      const r = await api.deleteTask(task.id);
+      if (r.ok) {
+        toast(`🗑️ 任务 ${task.id} 已删除`, 'ok');
+        loadAll();
+        close();
+      } else {
+        toast(r.error || '删除失败', 'err');
+      }
+    } catch {
+      toast('服务器连接失败', 'err');
+    }
+  };
+
   // Scheduler state
   const sched = schedData?.scheduler;
   const stalledSec = schedData?.stalledSec || 0;
@@ -268,6 +284,7 @@ export default function TaskModal() {
                 <button className="btn-action btn-cancel" onClick={handleCancel}>🚫 取消任务</button>
               </>
             )}
+            <button className="btn-action" style={{ background: 'rgba(255, 82, 112, 0.1)', color: '#ff5270', border: '1px solid rgba(255, 82, 112, 0.2)' }} onClick={handleDelete}>🗑️ 删除任务</button>
             {canResume && (
               <button className="btn-action btn-resume" onClick={() => doTaskAction('resume', '恢复执行')}>▶️ 恢复执行</button>
             )}
