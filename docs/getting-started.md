@@ -125,7 +125,25 @@ open http://127.0.0.1:7891
 
 ---
 
-## ❓ 故障排查
+## 💡 进阶功能：公共技能 (Common Skills)
+
+如果你希望为**所有** Agent 添加通用技能（如 `code_review`, `data_analysis` 等），可以将技能存放在 `~/.openclaw/common-skills` 目录下。
+
+系统启动时会自动将该目录下的所有技能合并到每个 Agent 的技能列表中。
+
+### 添加公共技能
+
+```bash
+python3 scripts/skill_manager.py add-remote \
+  --agent common \
+  --name code_review \
+  --source https://raw.githubusercontent.com/.../SKILL.md \
+  --description "全员通用代码审查技能"
+```
+
+---
+
+## 常见问题
 
 ### 看板显示「服务器未启动」
 ```bash
