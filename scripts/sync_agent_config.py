@@ -61,8 +61,7 @@ def normalize_model(model_value, fallback='unknown'):
     return fallback
 
 
-def get_skills(workspace: str):
-    skills_dir = pathlib.Path(workspace) / 'skills'
+def get_skills(skills_dir: pathlib.Path):
     skills = []
     try:
         if skills_dir.exists():
@@ -125,6 +124,12 @@ def main():
     default_model = normalize_model(agents_cfg.get('defaults', {}).get('model', {}), 'unknown')
     agents_list = agents_cfg.get('list', [])
     merged_models = _collect_openclaw_models(cfg)
+    
+    # 获取公共 Skills
+    common_skills_dir = pathlib.Path.home() / '.openclaw' / 'common-skills'
+    common_skills = get_skills(common_skills_dir)
+    for s in common_skills:
+        s['isCommon'] = True
 
     result = []
     seen_ids = set()
@@ -134,13 +139,18 @@ def main():
             continue
         meta = ID_LABEL[ag_id]
         workspace = ag.get('workspace', str(pathlib.Path.home() / f'.openclaw/workspace-{ag_id}'))
+        
+        # 合并公共 Skills 和 Agent 专有 Skills
+        agent_skills = get_skills(pathlib.Path(workspace) / 'skills')
+        all_skills = common_skills + agent_skills
+        
         result.append({
             'id': ag_id,
             'label': meta['label'], 'role': meta['role'], 'duty': meta['duty'], 'emoji': meta['emoji'],
             'model': normalize_model(ag.get('model', default_model), default_model),
             'defaultModel': default_model,
             'workspace': workspace,
-            'skills': get_skills(workspace),
+            'skills': all_skills,
             'allowAgents': ag.get('subagents', {}).get('allowAgents', []),
         })
         seen_ids.add(ag_id)
@@ -151,13 +161,18 @@ def main():
         if ag_id in seen_ids or ag_id not in ID_LABEL:
             continue
         meta = ID_LABEL[ag_id]
+        
+        # 合并公共 Skills 和 Agent 专有 Skills
+        agent_skills = get_skills(pathlib.Path(extra['workspace']) / 'skills')
+        all_skills = common_skills + agent_skills
+        
         result.append({
             'id': ag_id,
             'label': meta['label'], 'role': meta['role'], 'duty': meta['duty'], 'emoji': meta['emoji'],
             'model': extra['model'],
             'defaultModel': default_model,
             'workspace': extra['workspace'],
-            'skills': get_skills(extra['workspace']),
+            'skills': all_skills,
             'allowAgents': extra['allowAgents'],
             'isDefaultModel': True,
         })

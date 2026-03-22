@@ -77,7 +77,10 @@ def add_remote(agent_id: str, name: str, source_url: str, description: str = '')
         return False
     
     # 设置 workspace
-    workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / name
+    if agent_id == 'common':
+        workspace = OCLAW_HOME / 'common-skills' / name
+    else:
+        workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / name
     workspace.mkdir(parents=True, exist_ok=True)
     skill_md = workspace / 'SKILL.md'
     
@@ -125,6 +128,27 @@ def list_remote() -> bool:
     
     remote_skills = []
     
+    # 遍历公共 skills
+    common_skills_dir = OCLAW_HOME / 'common-skills'
+    if common_skills_dir.exists():
+        for skill_dir in common_skills_dir.iterdir():
+            if not skill_dir.is_dir():
+                continue
+            skill_name = skill_dir.name
+            source_json = skill_dir / '.source.json'
+            if source_json.exists():
+                try:
+                    source_info = json.loads(source_json.read_text())
+                    remote_skills.append({
+                        'agent': 'common',
+                        'skill': skill_name,
+                        'source': source_info.get('sourceUrl', 'N/A'),
+                        'desc': source_info.get('description', ''),
+                        'added': source_info.get('addedAt', 'N/A'),
+                    })
+                except Exception:
+                    pass
+
     for ws_dir in OCLAW_HOME.glob('workspace-*'):
         agent_id = ws_dir.name.replace('workspace-', '')
         skills_dir = ws_dir / 'skills'
@@ -174,7 +198,13 @@ def update_remote(agent_id: str, name: str) -> bool:
         print(f'❌ 错误：agent_id 或 skill 名称含非法字符')
         return False
     
-    workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / name
+    if agent_id == 'common':
+        workspace = OCLAW_HOME / 'common-skills' / name
+    else:
+        if agent_id == 'common':
+        workspace = OCLAW_HOME / 'common-skills' / name
+    else:
+        workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / name
     source_json = workspace / '.source.json'
     
     if not source_json.exists():
@@ -201,7 +231,10 @@ def remove_remote(agent_id: str, name: str) -> bool:
         print(f'❌ 错误：agent_id 或 skill 名称含非法字符')
         return False
     
-    workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / name
+    if agent_id == 'common':
+        workspace = OCLAW_HOME / 'common-skills' / name
+    else:
+        workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / name
     source_json = workspace / '.source.json'
     
     if not source_json.exists():

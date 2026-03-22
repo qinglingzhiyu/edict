@@ -40,6 +40,24 @@ check_deps() {
   fi
   log "Python3: $(python3 --version)"
 
+  # 检查并修复 openclaw.json 软链接循环 (Fix #124)
+  if [ -L "$OC_CFG" ]; then
+    warn "检测到 $OC_CFG 是软链接，正在检查有效性..."
+    if ! [ -e "$OC_CFG" ]; then
+      warn "软链接失效或循环引用，正在尝试从备份恢复..."
+      rm -f "$OC_CFG"
+      # 尝试寻找最近的备份
+      BAK=$(ls -t "$OC_HOME"/openclaw.json.bak* 2>/dev/null | head -1)
+      if [ -n "$BAK" ]; then
+        cp "$BAK" "$OC_CFG"
+        log "已从备份恢复: $BAK"
+      else
+        error "未找到可用的配置备份，请运行 'openclaw onboard' 重新生成。"
+        exit 1
+      fi
+    fi
+  fi
+
   if [ ! -f "$OC_CFG" ]; then
     error "未找到 openclaw.json。请先运行 openclaw 完成初始化。"
     exit 1
@@ -92,6 +110,10 @@ backup_existing() {
 create_workspaces() {
   info "创建 Agent Workspace..."
   
+  # 创建公共 skills 目录
+  mkdir -p "$OC_HOME/common-skills"
+  log "公共 Skills 目录已创建: $OC_HOME/common-skills"
+
   AGENTS=(pmo product ui frontend backend qa ops)
   for agent in "${AGENTS[@]}"; do
     ws="$OC_HOME/workspace-$agent"
@@ -125,7 +147,7 @@ register_agents() {
   info "注册技术部门 Agents..."
 
   # 备份配置
-  cp "$OC_CFG" "$OC_CFG.bak.sansheng-$(date +%Y%m%d-%H%M%S)"
+  cp "$OC_CFG" "$OC_CFG.bak.tech-dept-$(date +%Y%m%d-%H%M%S)"
   log "已备份配置: $OC_CFG.bak.*"
 
   python3 << 'PYEOF'
@@ -146,19 +168,32 @@ AGENTS = [
 
 agents_cfg = cfg.setdefault('agents', {})
 agents_list = agents_cfg.get('list', [])
-existing_ids = {a['id'] for a in agents_list}
 
 added = 0
+updated = 0
 for ag in AGENTS:
     ag_id = ag['id']
     ws = str(pathlib.Path.home() / f'.openclaw/workspace-{ag_id}')
-    if ag_id not in existing_ids:
-        entry = {'id': ag_id, 'workspace': ws, **{k:v for k,v in ag.items() if k!='id'}}
+    
+    # 构造新条目
+    entry = {'id': ag_id, 'workspace': ws, **{k:v for k,v in ag.items() if k!='id'}}
+    
+    # 查找并更新或追加
+    found = False
+    for i, existing_ag in enumerate(agents_list):
+        if existing_ag.get('id') == ag_id:
+            # 找到已有条目，直接更新内容 (覆盖)
+            agents_list[i] = entry
+            found = True
+            updated += 1
+            print(f'  ⚡ updated: {ag_id}')
+            break
+            
+    if not found:
+        # 未找到，追加新条目
         agents_list.append(entry)
         added += 1
         print(f'  + added: {ag_id}')
-    else:
-        print(f'  ~ exists: {ag_id} (skipped)')
 
 agents_cfg['list'] = agents_list
 
@@ -175,7 +210,7 @@ if cleaned:
     print(f'Cleaned {cleaned} invalid binding field(s)')
 
 cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2))
-print(f'Done: {added} agents added')
+print(f'Done: {added} agents added, {updated} agents updated')
 PYEOF
 
   log "Agents 注册完成"

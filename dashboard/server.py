@@ -54,34 +54,38 @@ _SAFE_NAME_RE = re.compile(r'^[a-zA-Z0-9_\-\u4e00-\u9fff]+$')
 
 
 def _ensure_openclaw_runtime_config():
-    """确保 openclaw 在本项目内有可用配置与身份文件。"""
+    """确保 openclaw 在本项目内有可用配置与身份文件，并同步到全局 ~/.openclaw/openclaw.json。"""
     OC_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 优先清理可能存在的软链接（Fix: 避免 Too many levels of symbolic links）
-    if OC_CONFIG_PATH.exists() and OC_CONFIG_PATH.is_symlink():
-        log.info(f"Removing symlink config: {OC_CONFIG_PATH}")
-        OC_CONFIG_PATH.unlink()
-
     cfg = {}
-    # 查找可用的源配置（优先从 ~/.openclaw 读取）
-    cfg_candidates = [
-        OCLAW_HOME / 'openclaw.json',
-        OCLAW_HOME / 'openclaw.json.bak',
-        OCLAW_HOME / 'openclaw.json.bak.1',
-        OCLAW_HOME / 'openclaw.json.bak.2',
-        OCLAW_HOME / 'openclaw.json.bak.3',
-        OCLAW_HOME / 'openclaw.json.bak.4',
-    ]
-    for c in cfg_candidates:
-        try:
-            if c.exists() and not c.is_symlink():
-                cfg = read_json(c, {})
-                if isinstance(cfg, dict) and cfg:
-                    log.info(f"Using source config from: {c}")
-                    break
-        except Exception:
-            continue
+    
+    # 1. 优先尝试从项目本地读取（作为最新状态）
+    if OC_CONFIG_PATH.exists() and not OC_CONFIG_PATH.is_symlink():
+        cfg = read_json(OC_CONFIG_PATH, {})
+        if cfg:
+            log.info(f"Using project local config: {OC_CONFIG_PATH}")
 
+    # 2. 如果本地没读到，尝试从全局/备份读取
+    if not cfg:
+        cfg_candidates = [
+            OCLAW_HOME / 'openclaw.json',
+            OCLAW_HOME / 'openclaw.json.bak',
+            OCLAW_HOME / 'openclaw.json.bak.1',
+            OCLAW_HOME / 'openclaw.json.bak.2',
+            OCLAW_HOME / 'openclaw.json.bak.3',
+            OCLAW_HOME / 'openclaw.json.bak.4',
+        ]
+        for c in cfg_candidates:
+            try:
+                if c.exists() and not c.is_symlink():
+                    cfg = read_json(c, {})
+                    if isinstance(cfg, dict) and cfg:
+                        log.info(f"Loaded config from source: {c}")
+                        break
+            except Exception:
+                continue
+
+    # 3. 如果还是没有，生成默认配置
     if not cfg:
         agent_cfg = read_json(DATA / 'agent_config.json', {})
         default_model = agent_cfg.get('defaultModel') or 'alibailian/qwen3-max-2026-01-23'
@@ -107,7 +111,21 @@ def _ensure_openclaw_runtime_config():
                 'subagents': {'allowAgents': ag.get('allowAgents', [])}
             })
 
+    # 4. 写入到项目本地
     atomic_json_write(OC_CONFIG_PATH, cfg)
+
+    # 5. 同步回全局 ~/.openclaw/openclaw.json (满足用户“复制到全局”需求，确保 openclaw tui 等可用)
+    global_cfg_path = OCLAW_HOME / 'openclaw.json'
+    try:
+        if global_cfg_path.exists() and global_cfg_path.is_symlink():
+            log.info(f"Removing global symlink: {global_cfg_path}")
+            global_cfg_path.unlink()
+        
+        # 将当前有效配置写入全局路径，解决 Error: Missing gateway auth token 等问题
+        atomic_json_write(global_cfg_path, cfg)
+        log.info(f"Synced config back to global path: {global_cfg_path}")
+    except Exception as e:
+        log.warning(f"Failed to sync config to global path {global_cfg_path}: {e}")
 
 
 def _openclaw_env():
@@ -310,7 +328,12 @@ def add_skill_to_agent(agent_id, skill_name, description, trigger=''):
         return {'ok': False, 'error': f'skill_name 含非法字符: {skill_name}'}
     if not _SAFE_NAME_RE.match(agent_id):
         return {'ok': False, 'error': f'agentId 含非法字符: {agent_id}'}
-    workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / skill_name
+    
+    if agent_id == 'common':
+        workspace = OCLAW_HOME / 'common-skills' / skill_name
+    else:
+        workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / skill_name
+        
     workspace.mkdir(parents=True, exist_ok=True)
     skill_md = workspace / 'SKILL.md'
     desc_line = description or skill_name
@@ -357,13 +380,20 @@ def add_remote_skill(agent_id, skill_name, source_url, description=''):
     
     source_url = source_url.strip()
     
-    # 检查 Agent 是否存在
-    cfg = read_json(DATA / 'agent_config.json', {})
-    agents = cfg.get('agents', [])
-    if not any(a.get('id') == agent_id for a in agents):
-        return {'ok': False, 'error': f'Agent {agent_id} 不存在'}
+    # 检查 Agent 是否存在 (如果是 common 则跳过)
+    if agent_id != 'common':
+        cfg = read_json(DATA / 'agent_config.json', {})
+        agents = cfg.get('agents', [])
+        if not any(a.get('id') == agent_id for a in agents):
+            return {'ok': False, 'error': f'Agent {agent_id} 不存在'}
     
-    # 下载或读取文件内容
+    # 确定保存路径
+    if agent_id == 'common':
+        workspace = OCLAW_HOME / 'common-skills' / skill_name
+    else:
+        workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / skill_name
+    workspace.mkdir(parents=True, exist_ok=True)
+    skill_md = workspace / 'SKILL.md'
     try:
         if source_url.startswith('http://') or source_url.startswith('https://'):
             # HTTPS URL 校验
@@ -421,11 +451,6 @@ def add_remote_skill(agent_id, skill_name, source_url, description=''):
     except Exception as e:
         return {'ok': False, 'error': f'YAML 格式无效: {str(e)[:100]}'}
     
-    # 创建本地目录
-    workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / skill_name
-    workspace.mkdir(parents=True, exist_ok=True)
-    skill_md = workspace / 'SKILL.md'
-    
     # 写入 SKILL.md
     skill_md.write_text(content)
     
@@ -464,6 +489,32 @@ def get_remote_skills_list():
     """列表所有已添加的远程 skills 及其源信息"""
     remote_skills = []
     
+    # 遍历公共 skills
+    common_skills_dir = OCLAW_HOME / 'common-skills'
+    if common_skills_dir.exists():
+        for skill_dir in common_skills_dir.iterdir():
+            if not skill_dir.is_dir():
+                continue
+            skill_name = skill_dir.name
+            source_json = skill_dir / '.source.json'
+            skill_md = skill_dir / 'SKILL.md'
+            if source_json.exists():
+                try:
+                    source_info = json.loads(source_json.read_text())
+                    status = 'valid' if skill_md.exists() else 'not-found'
+                    remote_skills.append({
+                        'skillName': skill_name,
+                        'agentId': 'common',
+                        'sourceUrl': source_info.get('sourceUrl', ''),
+                        'description': source_info.get('description', ''),
+                        'localPath': str(skill_md),
+                        'addedAt': source_info.get('addedAt', ''),
+                        'lastUpdated': source_info.get('lastUpdated', ''),
+                        'status': status,
+                    })
+                except Exception:
+                    pass
+
     # 遍历所有 workspace
     for ws_dir in OCLAW_HOME.glob('workspace-*'):
         agent_id = ws_dir.name.replace('workspace-', '')
@@ -514,7 +565,11 @@ def update_remote_skill(agent_id, skill_name):
     if not _SAFE_NAME_RE.match(skill_name):
         return {'ok': False, 'error': f'skillName 含非法字符: {skill_name}'}
     
-    workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / skill_name
+    if agent_id == 'common':
+        workspace = OCLAW_HOME / 'common-skills' / skill_name
+    else:
+        workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / skill_name
+    
     source_json = workspace / '.source.json'
     skill_md = workspace / 'SKILL.md'
     
@@ -546,7 +601,11 @@ def remove_remote_skill(agent_id, skill_name):
     if not _SAFE_NAME_RE.match(skill_name):
         return {'ok': False, 'error': f'skillName 含非法字符: {skill_name}'}
     
-    workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / skill_name
+    if agent_id == 'common':
+        workspace = OCLAW_HOME / 'common-skills' / skill_name
+    else:
+        workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / skill_name
+    
     if not workspace.exists():
         return {'ok': False, 'error': f'技能不存在: {skill_name}'}
     
@@ -2677,6 +2736,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    # 确保配置同步（项目本地 -> 全局）
+    _ensure_openclaw_runtime_config()
+
     parser = argparse.ArgumentParser(description='技术部门协作看板服务器')
     parser.add_argument('--port', type=int, default=7891)
     parser.add_argument('--host', default='127.0.0.1')
